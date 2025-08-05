@@ -25,6 +25,14 @@ from utils.consent_logging import (
     ConsentStatus,
     ConsentType
 )
+from utils.authentication_logging import (
+    create_authentication_logger,
+    log_login_attempt,
+    log_logout,
+    check_account_lockout,
+    AuthEventType,
+    AuthMethod
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -88,6 +96,9 @@ cleanup_scheduler.start_scheduler()
 
 # Initialize consent logging system
 consent_logger = create_consent_logging_system()
+
+# Initialize authentication logger
+auth_logger = create_authentication_logger()
 
 # Database Models
 class User(UserMixin, db.Model):
@@ -190,13 +201,41 @@ def login():
         if not data:
             return jsonify({'error': 'No data provided'}), 400
 
+        email = data.get('email', '')
+        password = data.get('password', '')
+        
+        # Check if account is locked
+        lockout_status = check_account_lockout(email)
+        if lockout_status['locked']:
+            # Log the blocked attempt
+            auth_logger.log_authentication_event(
+                user_id=email,  # Using email as identifier
+                event_type=AuthEventType.LOGIN_FAILURE,
+                auth_method=AuthMethod.PASSWORD,
+                success=False,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', ''),
+                failure_reason='Account locked due to multiple failed attempts'
+            )
+            return jsonify({
+                'error': 'Account temporarily locked due to multiple failed login attempts',
+                'unlock_time': lockout_status['unlock_time']
+            }), 423
+
         result = auth_system.authenticate_user(
-            email=data.get('email', ''),
-            password=data.get('password', ''),
+            email=email,
+            password=password,
             remember=data.get('remember', False)
         )
 
         if result['success']:
+            # Log successful login
+            log_login_attempt(
+                user_id=email,
+                success=True,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', '')
+            )
             # Update last login time
             user = User.query.get(result['user_id'])
             if user:
@@ -210,8 +249,15 @@ def login():
                 'expires_at': result['expires_at'].isoformat() if result.get('expires_at') else None
             }), 200
         else:
+            # Log failed login
+            log_login_attempt(
+                user_id=email,
+                success=False,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent', ''),
+                failure_reason=result['error']
+            )
             return jsonify({'error': result['error']}), 401
-
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
         return jsonify({'error': 'Login failed'}), 500
@@ -220,6 +266,14 @@ def login():
 @auth_required
 def logout():
     try:
+        # Log logout event
+        log_logout(
+            user_id=current_user.id,
+            session_id=session.get('session_id', ''),
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')
+        )
+        
         result = auth_system.logout_user()
 
         if result['success']:
@@ -318,6 +372,102 @@ def get_consent_history():
     except Exception as e:
         logger.error(f"Failed to get consent history: {str(e)}")
         return jsonify({'error': 'Failed to retrieve consent history'}), 500
+    
+@app.route('/api/auth/history', methods=['GET'])
+@auth_required
+def get_authentication_history():
+    """Get user's authentication history"""
+    try:
+        limit = min(int(request.args.get('limit', 50)), 100)  # Max 100 records
+        
+        history = auth_logger.get_user_authentication_history(
+            user_id=current_user.email,
+            limit=limit
+        )
+        
+        return jsonify({
+            'authentication_history': history,
+            'total_records': len(history)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Failed to get authentication history: {str(e)}")
+        return jsonify({'error': 'Failed to retrieve authentication history'}), 500
+    
+@app.route('/api/auth/security-report', methods=['GET'])
+@auth_required
+def get_security_report():
+    """Get personal security report"""
+    try:
+        # Generate report for current user only
+        start_date = datetime.utcnow() - timedelta(days=30)
+        
+        # Get user's records
+        user_records = auth_logger.get_user_authentication_history(
+            user_id=current_user.email,
+            start_date=start_date,
+            limit=1000
+        )
+        
+        # Calculate user-specific stats
+        total_logins = len([r for r in user_records if r['event_type'] == 'login_success'])
+        failed_attempts = len([r for r in user_records if r['event_type'] == 'login_failure'])
+
+        return jsonify({
+            'report_period_days': 30,
+            'total_successful_logins': total_logins,
+            'failed_login_attempts': failed_attempts,
+            'recent_activity': user_records[:10],  # Last 10 events
+            'account_security_score': max(0, 100 - (failed_attempts * 5)),  # Simple scoring
+            'generated_at': datetime.utcnow().isoformat()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Failed to generate security report: {str(e)}")
+        return jsonify({'error': 'Failed to generate security report'}), 500
+    
+@app.route('/api/admin/auth/report', methods=['GET'])
+@auth_required  # Add admin check in production
+def get_admin_security_report():
+    """Generate comprehensive security report for admins"""
+    try:
+        days = int(request.args.get('days', 30))
+        start_date = datetime.utcnow() - timedelta(days=days)
+        
+        report = auth_logger.generate_security_report(start_date=start_date)
+        return jsonify(report), 200
+        
+    except Exception as e:
+        logger.error(f"Failed to generate admin security report: {str(e)}")
+        return jsonify({'error': 'Failed to generate security report'}), 500
+    
+@app.route('/api/admin/auth/export', methods=['GET'])
+@auth_required  # Add admin check in production
+def export_authentication_logs():
+    """Export authentication logs for compliance"""
+    try:
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        user_id = request.args.get('user_id')
+        
+        # Parse dates if provided
+        start_dt = datetime.fromisoformat(start_date) if start_date else None
+        end_dt = datetime.fromisoformat(end_date) if end_date else None
+        
+        records = auth_logger.export_records(
+            user_id=user_id,
+            start_date=start_dt,
+            end_date=end_dt
+        )
+        
+        return jsonify({ 'authentication_records': records,
+            'total_records': len(records),
+            'exported_at': datetime.utcnow().isoformat()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Failed to export authentication logs: {str(e)}")
+        return jsonify({'error': 'Failed to export authentication logs'}), 500
 
 @app.route('/api/consent/withdraw', methods=['POST'])
 @auth_required
