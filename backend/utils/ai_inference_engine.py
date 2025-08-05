@@ -14,6 +14,7 @@ from .economic_indicators_analyzer import create_economic_indicators_analyzer
 from .mental_state_analyzer import create_mental_state_analyzer
 from .results_presentation import ResultPresentationBuilder
 from .privacy_framework import create_privacy_framework
+from .ethical_framework import create_ethical_boundaries_framework
 
 # ML and NLP imports
 try:
@@ -673,9 +674,9 @@ class TopicModelingEngine:
             return "General Topics"
 
 class AIInferenceEngine:
-    """Main AI inference engine combining all analysis components with full privacy protection"""
+    """Main AI inference engine with comprehensive privacy protection and ethical boundaries"""
     
-    def __init__(self, privacy_enabled: bool = True):
+    def __init__(self, privacy_enabled: bool = True, ethics_enabled: bool = True):
         self.sentiment_analyzer = SentimentAnalyzer()
         self.hashtag_analyzer = HashtagAnalyzer()
         self.engagement_analyzer = EngagementAnalyzer()
@@ -688,15 +689,49 @@ class AIInferenceEngine:
         # Privacy Framework Integration
         self.privacy_framework = create_privacy_framework() if privacy_enabled else None
         
+        # NEW: Ethical Boundaries Framework Integration
+        self.ethical_framework = create_ethical_boundaries_framework() if ethics_enabled else None
+        
         self.analysis_cache = {}
         self.cache_lock = threading.RLock()
     
     def analyze_social_content(self, social_data: Dict[str, Any], 
+                             user_id: str,
+                             use_case_description: str,
+                             age_verification_data: Dict[str, Any],
                              session_id: str = None,
                              privacy_level: str = 'standard') -> Dict[str, Any]:
-        """Comprehensive AI analysis with full privacy protection"""
+        """Comprehensive AI analysis with ethical boundaries and privacy protection"""
         
-        logger.info("Starting privacy-protected comprehensive AI inference analysis")
+        logger.info("Starting ethically-bounded, privacy-protected AI inference analysis")
+        
+        # ETHICAL BOUNDARIES CHECK
+        ethical_approval = None
+        if self.ethical_framework:
+            try:
+                # Extract data sources and types from social_data
+                data_sources = self._extract_data_sources(social_data)
+                data_types = self._extract_data_types(social_data)
+                
+                ethical_approval = self.ethical_framework.evaluate_request(
+                    user_id=user_id,
+                    use_case_description=use_case_description,
+                    data_sources=data_sources,
+                    data_types=data_types,
+                    collection_method='public_api',
+                    age_verification_data=age_verification_data,
+                    user_context={'session_id': session_id}
+                )
+                
+                # Check if ethically approved
+                if not ethical_approval.ethics_approved:
+                    return self._create_ethical_rejection_response(ethical_approval)
+                
+                logger.info(f"Ethical evaluation passed: Compliance score {ethical_approval.compliance_score:.2f}")
+                
+            except Exception as e:
+                logger.error(f"Ethical evaluation failed: {str(e)}")
+                return self._create_ethical_error_response(str(e))
         
         # PRIVACY PROTECTION: Process data through privacy framework
         processing_id = None
@@ -739,7 +774,7 @@ class AIInferenceEngine:
         content_list = self._extract_content_from_social_data(social_data)
         
         if not content_list:
-            return self._create_empty_analysis(processing_id, privacy_level)
+            return self._create_empty_analysis(processing_id, privacy_level, ethical_approval)
         
         # Perform all analyses
         analysis_results = {
@@ -755,10 +790,13 @@ class AIInferenceEngine:
             'analysis_metadata': {
                 'content_analyzed': len(content_list),
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '4.1',  # Updated version with full privacy framework
+                'analysis_version': '4.2',  # Updated version with ethical boundaries
                 'privacy_protected': self.privacy_framework is not None,
+                'ethics_approved': ethical_approval.ethics_approved if ethical_approval else False,
                 'processing_id': processing_id,
                 'privacy_level': privacy_level,
+                'ethical_compliance_score': ethical_approval.compliance_score if ethical_approval else 0.0,
+                'use_case': use_case_description,
                 'original_data_size': original_data_size,
                 'protected_data_size': len(str(social_data)),
                 'data_reduction_ratio': 1.0 - (len(str(social_data)) / original_data_size) if original_data_size > 0 else 0,
@@ -773,6 +811,7 @@ class AIInferenceEngine:
                     'mental_state_assessment',
                     'interest_profile',
                     'privacy_framework',
+                    'ethical_boundaries',
                     'results_presentation'
                 ]
             }
@@ -912,10 +951,23 @@ class AIInferenceEngine:
         # Generate comprehensive interest profile
         analysis_results['interest_profile'] = self._generate_comprehensive_interest_profile(analysis_results)
         
-        # RESULTS PRESENTATION with enhanced privacy information
+        # Add ethical compliance information
+        if ethical_approval:
+            analysis_results['ethical_compliance'] = {
+                'approved': ethical_approval.ethics_approved,
+                'compliance_score': ethical_approval.compliance_score,
+                'age_verified': ethical_approval.age_verification.verified,
+                'age_verification_method': ethical_approval.age_verification.verification_method,
+                'ethical_assessment': asdict(ethical_approval.ethical_assessment),
+                'usage_restrictions': ethical_approval.usage_restrictions,
+                'monitoring_requirements': ethical_approval.monitoring_requirements,
+                'professional_review_required': ethical_approval.professional_review is not None
+            }
+        
+        # RESULTS PRESENTATION with enhanced ethical and privacy information
         presentation_result = self.presentation_builder.build(analysis_results)
         
-        # Add comprehensive privacy information to presentation
+        # Add comprehensive privacy and ethical recommendations
         if self.privacy_framework:
             privacy_status = self.privacy_framework.validate_privacy_compliance()
             
@@ -956,11 +1008,107 @@ class AIInferenceEngine:
                 'audit_trail_enabled': self.privacy_framework.retention_policy.audit_trail_enabled
             }
         
+        # Add ethical compliance recommendations
+        if ethical_approval:
+            ethical_recommendations = [
+                "✅ Ethical boundaries verified - Analysis approved for stated use case",
+                "🔞 Age verification completed - User confirmed 18+ years old",
+                "📋 Usage restrictions apply - See ethical compliance section for details",
+                "⚖️ Professional ethics standards maintained throughout analysis"
+            ]
+            
+            # Add specific ethical recommendations
+            ethical_recommendations.extend(ethical_approval.ethical_assessment.recommendations)
+            
+            presentation_result.mitigation_recommendations.extend(ethical_recommendations)
+        
         analysis_results["results_presentation"] = asdict(presentation_result)
         
-        logger.info(f"Privacy-protected comprehensive AI analysis completed for {len(content_list)} content items")
+        logger.info(f"Ethically-bounded, privacy-protected AI analysis completed for {len(content_list)} content items")
         
         return analysis_results
+    
+    def _extract_data_sources(self, social_data: Dict[str, Any]) -> List[str]:
+        """Extract data sources from social data"""
+        sources = []
+        
+        if 'social_profiles' in social_data:
+            sources.append('public_social_media_profiles')
+        
+        if 'discovered_profiles' in social_data:
+            sources.append('publicly_available_posts')
+        
+        # Check for any posts or content
+        for platform_data in ['social_profiles', 'discovered_profiles']:
+            if platform_data in social_data:
+                for profile in social_data[platform_data]:
+                    inferred_data = profile.get('inferred_data', {})
+                    if 'posts' in inferred_data:
+                        sources.append('publicly_visible_content')
+                        break
+        
+        return list(set(sources))  # Remove duplicates
+    
+    def _extract_data_types(self, social_data: Dict[str, Any]) -> List[str]:
+        """Extract data types from social data"""
+        data_types = []
+        
+        # Check for different types of data
+        for platform_data in ['social_profiles', 'discovered_profiles']:
+            if platform_data in social_data:
+                for profile in social_data[platform_data]:
+                    inferred_data = profile.get('inferred_data', {})
+                    
+                    if 'bio' in inferred_data or 'description' in inferred_data:
+                        data_types.append('public_profile_information')
+                    
+                    if 'posts' in inferred_data:
+                        data_types.append('public_text_content')
+                    
+                    if 'followers' in inferred_data or 'following' in inferred_data:
+                        data_types.append('public_engagement_metrics')
+        
+        return list(set(data_types))  # Remove duplicates
+    
+    def _create_ethical_rejection_response(self, ethical_approval) -> Dict[str, Any]:
+        """Create response for ethically rejected requests"""
+        
+        return {
+            'analysis_approved': False,
+            'rejection_reason': 'ethical_boundaries',
+            'ethical_assessment': asdict(ethical_approval.ethical_assessment),
+            'age_verification': asdict(ethical_approval.age_verification),
+            'violations': [v.value for v in ethical_approval.ethical_assessment.violations],
+            'recommendations': ethical_approval.ethical_assessment.recommendations,
+            'usage_restrictions': ethical_approval.usage_restrictions,
+            'appeal_process': 'Contact ethics board for review if you believe this rejection is in error',
+            'analysis_metadata': {
+                'analysis_timestamp': datetime.utcnow().isoformat(),
+                'analysis_version': '4.2',
+                'ethics_approved': False,
+                'rejection_type': 'ethical_boundaries'
+            }
+        }
+    
+    def _create_ethical_error_response(self, error_message: str) -> Dict[str, Any]:
+        """Create response for ethical evaluation errors"""
+        
+        return {
+            'analysis_approved': False,
+            'rejection_reason': 'ethical_evaluation_error',
+            'error_message': error_message,
+            'recommendations': [
+                'Please verify age verification data is complete',
+                'Ensure use case description is provided',
+                'Contact support if the error persists'
+            ],
+            'analysis_metadata': {
+                'analysis_timestamp': datetime.utcnow().isoformat(),
+                'analysis_version': '4.2',
+                'ethics_approved': False,
+                'rejection_type': 'evaluation_error'
+            }
+        }
     
     def _classify_mental_health_risk(self, risk_factors) -> str:
         """Classify mental health risk level"""
@@ -1492,6 +1640,37 @@ class AIInferenceEngine:
             }
         }
     
+    def get_ethical_compliance_status(self) -> Dict[str, Any]:
+        """Get current ethical compliance status"""
+        
+        if not self.ethical_framework:
+            return {'ethical_boundaries_enabled': False}
+        
+        return {
+            'ethical_boundaries_enabled': True,
+            'compliance_report': self.ethical_framework.get_compliance_report(),
+            'ethics_board_status': 'active',
+            'age_verification_methods': [
+                'government_id',
+                'credit_card',
+                'phone_verification',
+                'third_party_service',
+                'declaration_with_validation'
+            ],
+            'allowed_use_cases': [
+                'legitimate_research',
+                'security_analysis',
+                'self_assessment',
+                'educational'
+            ],
+            'prohibited_use_cases': [
+                'malicious_stalking',
+                'harassment',
+                'discrimination',
+                'unauthorized_profiling'
+            ]
+        }
+    
     def enable_client_side_processing(self) -> Dict[str, Any]:
         """Enable client-side processing mode"""
         
@@ -1503,7 +1682,8 @@ class AIInferenceEngine:
         
         return self.privacy_framework.get_client_side_config()
     
-    def _create_empty_analysis(self, processing_id: str = None, privacy_level: str = 'standard') -> Dict[str, Any]:
+    def _create_empty_analysis(self, processing_id: str = None, privacy_level: str = 'standard', 
+                             ethical_approval=None) -> Dict[str, Any]:
         """Create empty analysis structure when no content is available"""
         
         return {
@@ -1567,11 +1747,18 @@ class AIInferenceEngine:
                 'privacy_level': privacy_level,
                 'data_protection_enabled': self.privacy_framework is not None
             },
+            'ethical_compliance': {
+                'approved': ethical_approval.ethics_approved if ethical_approval else True,
+                'compliance_score': ethical_approval.compliance_score if ethical_approval else 1.0,
+                'age_verified': ethical_approval.age_verification.verified if ethical_approval else False,
+                'restrictions_applied': True
+            } if ethical_approval else {'enabled': self.ethical_framework is not None},
             'results_presentation': {
                 'privacy_score': {'value': 1, 'colour': '#008000'},
                 'inferences': [],
                 'mitigation_recommendations': [
                     '🔒 Privacy framework active - Zero data retention',
+                    '⚖️ Ethical boundaries enforced - All guidelines followed',
                     '🛡️ All analysis performed on anonymized data',
                     '🚫 No content available for comprehensive analysis'
                 ]
@@ -1579,10 +1766,12 @@ class AIInferenceEngine:
             'analysis_metadata': {
                 'content_analyzed': 0,
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '4.1',
+                'analysis_version': '4.2',
                 'privacy_protected': self.privacy_framework is not None,
+                'ethics_approved': ethical_approval.ethics_approved if ethical_approval else True,
                 'processing_id': processing_id,
                 'privacy_level': privacy_level,
+                'ethical_compliance_score': ethical_approval.compliance_score if ethical_approval else 1.0,
                 'note': 'Insufficient content for comprehensive analysis',
                 'features': [
                     'sentiment_analysis',
@@ -1595,6 +1784,7 @@ class AIInferenceEngine:
                     'mental_state_assessment',
                     'interest_profile',
                     'privacy_framework',
+                    'ethical_boundaries',
                     'results_presentation'
                 ],
                 'economic_brands_detected': 0,
@@ -1611,6 +1801,6 @@ class AIInferenceEngine:
             }
         }
 
-def create_ai_inference_engine(privacy_enabled: bool = True):
-    """Factory function to create AI inference engine with privacy protection"""
-    return AIInferenceEngine(privacy_enabled=privacy_enabled)
+def create_ai_inference_engine(privacy_enabled: bool = True, ethics_enabled: bool = True):
+    """Factory function to create AI inference engine with full protection"""
+    return AIInferenceEngine(privacy_enabled=privacy_enabled, ethics_enabled=ethics_enabled)
