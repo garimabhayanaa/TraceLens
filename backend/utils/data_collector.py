@@ -11,10 +11,11 @@ from .social_discovery import create_social_discovery_engine
 from .public_records import create_public_records_scanner
 from .cross_platform_correlation import create_cross_platform_correlator
 from .privacy_compliance import (
-    create_privacy_compliant_collector, 
-    PrivacyConfig, 
+    create_privacy_compliant_collector,
+    PrivacyConfig,
     DataClassifier
 )
+from .ai_inference_engine import create_ai_inference_engine
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -51,16 +52,17 @@ class DataCollectionEngine:
         # Increased rate limiting for ethical collection
         self.rate_limit_delay = 2.0  # seconds between requests
         
-        # Initialize other components
+        # Initialize all components
         self.input_processor = create_input_processor()  # Enhanced input processing
         self.social_discovery = create_social_discovery_engine()
         self.public_records_scanner = create_public_records_scanner()
         self.cross_platform_correlator = create_cross_platform_correlator()
+        self.ai_inference_engine = create_ai_inference_engine()  # NEW: AI inference engine
 
     def collect_public_data(self, name: str, email: str, social_links: List[str]) -> Dict[str, Any]:
-        """Main entry point for privacy-first comprehensive data collection"""
+        """Main entry point for privacy-first comprehensive data collection with AI analysis"""
         
-        logger.info("Starting privacy-compliant data collection with comprehensive features")
+        logger.info("Starting privacy-compliant data collection with comprehensive features and AI analysis")
         
         # Enhanced input validation and processing
         input_validation = self.input_processor.process_input(name, email)
@@ -78,8 +80,9 @@ class DataCollectionEngine:
             'web_presence': [],
             'public_records': [],  # Public records
             'cross_platform_correlation': {},  # Correlation analysis
-            'data_sources_attribution': [],  # NEW: Data source attribution
-            'privacy_compliance': {  # NEW: Privacy compliance report
+            'ai_analysis': {},  # NEW: AI inference analysis
+            'data_sources_attribution': [],  # Data source attribution
+            'privacy_compliance': {  # Privacy compliance report
                 'collection_method': 'privacy_first',
                 'robots_txt_respected': True,
                 'rate_limited': True,
@@ -108,7 +111,7 @@ class DataCollectionEngine:
                         )
                         # Add data classification
                         profile_data['data_sensitivity'] = DataClassifier.classify_data_sensitivity(
-                            profile_data.get('data_type', ''), 
+                            profile_data.get('data_type', ''),
                             profile_data.get('platform', '')
                         )
                         profile_data['collection_compliance'] = 'privacy_first'
@@ -221,6 +224,45 @@ class DataCollectionEngine:
                 'overall_correlation_score': 0.0
             }
 
+        # AI INFERENCE AND INTEREST ANALYSIS
+        try:
+            logger.info("Starting AI-powered interest analysis...")
+            
+            # Perform comprehensive AI analysis on collected data
+            ai_analysis = self.ai_inference_engine.analyze_social_content(collected_data)
+            
+            # Add AI analysis to collected data
+            collected_data['ai_analysis'] = ai_analysis
+            
+            # Update metadata with AI insights
+            collected_data['metadata'].update({
+                'ai_analysis_completed': True,
+                'sentiment_detected': ai_analysis.get('sentiment_analysis', {}).get('overall_sentiment', 'neutral'),
+                'topics_identified': len(ai_analysis.get('topic_modeling', {}).get('topics', [])),
+                'interests_discovered': len(ai_analysis.get('interest_profile', {}).get('primary_interests', [])),
+                'content_analyzed': ai_analysis.get('analysis_metadata', {}).get('content_analyzed', 0)
+            })
+            
+            logger.info(f"AI analysis completed: "
+                       f"Sentiment: {ai_analysis['sentiment_analysis']['overall_sentiment']}, "
+                       f"Topics: {len(ai_analysis['topic_modeling']['topics'])}, "
+                       f"Primary Interests: {len(ai_analysis['interest_profile']['primary_interests'])}")
+            
+        except Exception as e:
+            logger.error(f"AI inference analysis failed: {str(e)}")
+            collected_data['ai_analysis'] = {
+                'error': str(e),
+                'analysis_available': False,
+                'sentiment_analysis': {'overall_sentiment': 'neutral', 'error': str(e)},
+                'topic_modeling': {'topics': [], 'error': str(e)},
+                'interest_profile': {'primary_interests': [], 'error': str(e)},
+                'analysis_metadata': {
+                    'content_analyzed': 0,
+                    'analysis_timestamp': time.time(),
+                    'error': str(e)
+                }
+            }
+
         # Generate comprehensive data source attribution
         collected_data['data_sources_attribution'] = self._generate_attribution_report()
         
@@ -230,10 +272,11 @@ class DataCollectionEngine:
             'robots_txt_violations': 0,  # We respect all robots.txt
             'rate_limit_violations': 0,  # We implement conservative rate limiting
             'private_data_collected': False,  # We only collect public data
-            'attribution_complete': True
+            'attribution_complete': True,
+            'ai_analysis_performed': 'ai_analysis' in collected_data and 'error' not in collected_data['ai_analysis']
         })
 
-        logger.info("Privacy-compliant comprehensive data collection completed")
+        logger.info("Privacy-compliant comprehensive data collection with AI analysis completed")
         return collected_data
 
     def _collect_social_profile_data_private(self, url: str) -> Optional[Dict[str, Any]]:
@@ -244,7 +287,7 @@ class DataCollectionEngine:
             
             # First, use privacy-compliant collector for basic data
             raw_data = self.privacy_collector.collect_data(
-                url, 
+                url,
                 data_type='social_profile',
                 platform=self._extract_platform_name(domain)
             )
@@ -301,6 +344,8 @@ class DataCollectionEngine:
         # Only include truly public information
         if 'title' in raw_data:
             data['inferred_data']['page_title'] = raw_data['title'][:100]  # Limit length
+        if 'description' in raw_data:
+            data['inferred_data']['bio'] = raw_data['description'][:300]  # For AI analysis
         
         return data
 
@@ -335,7 +380,7 @@ class DataCollectionEngine:
         if 'title' in raw_data:
             data['inferred_data']['page_title'] = raw_data['title'][:100]
         if 'description' in raw_data:
-            data['inferred_data']['page_description'] = raw_data['description'][:200]
+            data['inferred_data']['bio'] = raw_data['description'][:300]  # For AI analysis
 
         return data
 
@@ -373,6 +418,10 @@ class DataCollectionEngine:
             if field in raw_data:
                 data['inferred_data'][field] = raw_data[field]
 
+        # Include bio for AI analysis if available
+        if 'bio' in raw_data and raw_data['bio']:
+            data['inferred_data']['bio'] = raw_data['bio']
+
         # Assess privacy impact
         if raw_data.get('bio') or raw_data.get('location'):
             data['privacy_score_impact'] = -1.5
@@ -383,7 +432,7 @@ class DataCollectionEngine:
     def _enhance_instagram_data_private(self, raw_data: Dict[str, Any], url: str) -> Dict[str, Any]:
         """Enhance Instagram data with privacy compliance"""
         
-        return {
+        data = {
             'platform': 'instagram',
             'url': url,
             'data_type': 'lifestyle_social',
@@ -407,10 +456,16 @@ class DataCollectionEngine:
             'note': 'Minimal data collection due to platform restrictions'
         }
 
+        # Include any available bio/description for AI analysis
+        if 'description' in raw_data:
+            data['inferred_data']['bio'] = raw_data['description'][:200]
+
+        return data
+
     def _enhance_facebook_data_private(self, raw_data: Dict[str, Any], url: str) -> Dict[str, Any]:
         """Enhance Facebook data with privacy compliance"""
         
-        return {
+        data = {
             'platform': 'facebook',
             'url': url,
             'data_type': 'personal_social',
@@ -432,6 +487,12 @@ class DataCollectionEngine:
             'collection_method': 'profile_existence_check',
             'note': 'Minimal data collection due to strict privacy controls'
         }
+
+        # Include any available bio/description for AI analysis
+        if 'description' in raw_data:
+            data['inferred_data']['bio'] = raw_data['description'][:200]
+
+        return data
 
     def _enhance_generic_data_private(self, raw_data: Dict[str, Any], url: str) -> Dict[str, Any]:
         """Enhance generic profile data with privacy compliance"""
@@ -460,7 +521,7 @@ class DataCollectionEngine:
         if 'title' in raw_data:
             data['inferred_data']['page_title'] = raw_data['title'][:100]
         if 'description' in raw_data:
-            data['inferred_data']['page_description'] = raw_data['description'][:200]
+            data['inferred_data']['bio'] = raw_data['description'][:300]  # For AI analysis
 
         return data
 
@@ -482,7 +543,7 @@ class DataCollectionEngine:
                 
                 # Check for indicators that profile requires authentication
                 private_indicators = [
-                    'login required', 'sign in', 'authenticate', 
+                    'login required', 'sign in', 'authenticate',
                     'private profile', 'account suspended', 'page not found'
                 ]
                 
@@ -550,6 +611,14 @@ class DataCollectionEngine:
                 'timestamp': time.time(),
                 'robots_compliant': True,
                 'data_classification': 'derived',
+                'legal_basis': 'legitimate_interest'
+            },
+            {
+                'source_type': 'ai_inference_analysis',
+                'platform': 'internal',
+                'timestamp': time.time(),
+                'robots_compliant': True,
+                'data_classification': 'analyzed',
                 'legal_basis': 'legitimate_interest'
             }
         ]
@@ -724,7 +793,7 @@ class DataCollectionEngine:
         return analysis
 
     def get_collection_summary(self, collected_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate enhanced collection summary with privacy compliance metrics"""
+        """Generate enhanced collection summary with privacy compliance and AI analysis metrics"""
         
         summary = {
             'total_sources_attempted': collected_data['metadata']['sources_attempted'],
@@ -751,15 +820,24 @@ class DataCollectionEngine:
                 'collection_method': collected_data['privacy_compliance']['collection_method']
             },
             
+            # AI analysis metrics
+            'ai_analysis': {
+                'analysis_completed': collected_data['metadata'].get('ai_analysis_completed', False),
+                'sentiment_detected': collected_data['metadata'].get('sentiment_detected', 'neutral'),
+                'topics_identified': collected_data['metadata'].get('topics_identified', 0),
+                'interests_discovered': collected_data['metadata'].get('interests_discovered', 0),
+                'content_analyzed': collected_data['metadata'].get('content_analyzed', 0)
+            },
+            
             # Attribution summary
             'attribution_summary': {
                 'total_sources': len(collected_data.get('data_sources_attribution', [])),
                 'source_types': list(set(
-                    source.get('source_type', 'unknown') 
+                    source.get('source_type', 'unknown')
                     for source in collected_data.get('data_sources_attribution', [])
                 )),
                 'platforms_accessed': list(set(
-                    source.get('platform', 'unknown') 
+                    source.get('platform', 'unknown')
                     for source in collected_data.get('data_sources_attribution', [])
                 ))
             }
