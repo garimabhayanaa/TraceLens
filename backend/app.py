@@ -147,6 +147,64 @@ def logout():
     return jsonify({'message': 'Logged out successfully'}), 200
 
 
+@app.route('/api/analyze', methods=['POST'])
+@login_required
+@limiter.limit("3 per day")
+def start_analysis():
+    data = request.get_json()
+
+    target_email = data.get('email', '').lower().strip()
+    target_name = data.get('name', '').strip()
+    social_links = data.get('social_links', [])
+
+    # Validation
+    if not target_email or not re.match(r'^[^@]+@[^@]+\.[^@]+$', target_email):
+        return jsonify({'error': 'Invalid email format'}), 400
+
+    # Authorization check - users can only analyze their own email
+    if target_email != current_user.email:
+        return jsonify({'error': 'You can only analyze your own digital footprint'}), 403
+
+    # Check for existing recent analysis
+    recent_analysis = Analysis.query.filter_by(
+        user_id=current_user.id,
+        target_email=target_email
+    ).filter(Analysis.created_at > datetime.utcnow() - timedelta(hours=1)).first()
+
+    if recent_analysis and not recent_analysis.is_expired():
+        return jsonify({'error': 'Please wait before running another analysis'}), 429
+
+    # Create analysis record
+    analysis = Analysis(
+        user_id=current_user.id,
+        target_email=target_email,
+        status='processing'
+    )
+
+    try:
+        db.session.add(analysis)
+        db.session.commit()
+
+        # Perform the analysis
+        from utils.analyzer import perform_analysis
+        results = perform_analysis(target_name, target_email, social_links)
+
+        analysis.results = results
+        analysis.status = 'completed'
+        db.session.commit()
+
+        return jsonify({
+            'analysis_id': analysis.id,
+            'status': 'completed',
+            'results': results
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Analysis error: {str(e)}")
+        return jsonify({'error': 'Analysis failed to complete'}), 500
+
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
