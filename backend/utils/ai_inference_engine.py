@@ -9,6 +9,7 @@ from collections import defaultdict, Counter
 import time
 from datetime import datetime, timedelta
 import threading
+from .schedule_pattern_detector import create_schedule_pattern_detector
 
 # ML and NLP imports
 try:
@@ -668,20 +669,21 @@ class TopicModelingEngine:
             return "General Topics"
 
 class AIInferenceEngine:
-    """Main AI inference engine combining all analysis components"""
+    """Main AI inference engine combining all analysis components including schedule patterns"""
     
     def __init__(self):
         self.sentiment_analyzer = SentimentAnalyzer()
         self.hashtag_analyzer = HashtagAnalyzer()
         self.engagement_analyzer = EngagementAnalyzer()
         self.topic_engine = TopicModelingEngine()
+        self.schedule_detector = create_schedule_pattern_detector()  # NEW: Schedule pattern detector
         self.analysis_cache = {}
         self.cache_lock = threading.RLock()
     
     def analyze_social_content(self, social_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Comprehensive AI analysis of social media content"""
+        """Comprehensive AI analysis including schedule pattern detection"""
         
-        logger.info("Starting comprehensive AI inference analysis")
+        logger.info("Starting comprehensive AI inference analysis with schedule patterns")
         
         # Extract content from social data
         content_list = self._extract_content_from_social_data(social_data)
@@ -696,18 +698,62 @@ class AIInferenceEngine:
             'mention_patterns': self._analyze_mention_patterns(content_list),
             'engagement_analysis': self._analyze_engagement(social_data),
             'topic_modeling': self._perform_topic_modeling(content_list),
+            'schedule_patterns': {},  # NEW: Schedule pattern analysis
             'interest_profile': {},
             'analysis_metadata': {
                 'content_analyzed': len(content_list),
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '1.0'
+                'analysis_version': '2.0',  # Updated version with schedule patterns
+                'features': [
+                    'sentiment_analysis',
+                    'hashtag_patterns', 
+                    'mention_patterns',
+                    'engagement_analysis',
+                    'topic_modeling',
+                    'schedule_patterns',
+                    'interest_profile'
+                ]
             }
         }
         
-        # Generate comprehensive interest profile
-        analysis_results['interest_profile'] = self._generate_interest_profile(analysis_results)
+        # SCHEDULE PATTERN DETECTION
+        try:
+            logger.info("Starting advanced schedule pattern detection...")
+            schedule_analysis = self.schedule_detector.analyze_schedule_patterns(social_data)
+            
+            analysis_results['schedule_patterns'] = {
+                'post_timing': asdict(schedule_analysis.post_timing),
+                'activity_frequency': asdict(schedule_analysis.activity_frequency),
+                'geographic_inference': asdict(schedule_analysis.geographic_inference),
+                'work_personal_boundary': asdict(schedule_analysis.work_personal_boundary),
+                'overall_schedule_score': schedule_analysis.overall_schedule_score,
+                'behavioral_insights': schedule_analysis.behavioral_insights,
+                'privacy_implications': schedule_analysis.privacy_implications,
+                'analysis_completed': True
+            }
+            
+            logger.info(f"Schedule pattern detection completed successfully: "
+                       f"Score {schedule_analysis.overall_schedule_score:.2f}, "
+                       f"Insights: {len(schedule_analysis.behavioral_insights)}")
+            
+        except Exception as e:
+            logger.error(f"Schedule pattern detection failed: {str(e)}")
+            analysis_results['schedule_patterns'] = {
+                'error': str(e),
+                'analysis_completed': False,
+                'post_timing': {},
+                'activity_frequency': {},
+                'geographic_inference': {},
+                'work_personal_boundary': {},
+                'overall_schedule_score': 0.0,
+                'behavioral_insights': [],
+                'privacy_implications': []
+            }
         
-        logger.info(f"AI inference analysis completed for {len(content_list)} content items")
+        # Generate comprehensive interest profile (now including schedule insights)
+        analysis_results['interest_profile'] = self._generate_enhanced_interest_profile(analysis_results)
+        
+        logger.info(f"Enhanced AI inference analysis completed for {len(content_list)} content items")
         
         return analysis_results
     
@@ -903,8 +949,8 @@ class AIInferenceEngine:
             'total_topics_identified': len(topics)
         }
     
-    def _generate_interest_profile(self, analysis_results: Dict[str, Any]) -> InterestProfile:
-        """Generate comprehensive interest profile from all analyses"""
+    def _generate_enhanced_interest_profile(self, analysis_results: Dict[str, Any]) -> InterestProfile:
+        """Generate enhanced interest profile including schedule patterns"""
         
         # Extract primary interests from topic modeling
         primary_interests = []
@@ -923,33 +969,52 @@ class AIInferenceEngine:
             if hashtag not in interest_scores:
                 interest_scores[hashtag] = pattern['trending_score']
         
-        # Behavioral patterns from sentiment and engagement
+        # Behavioral patterns from sentiment, engagement, and schedule
         sentiment_data = analysis_results.get('sentiment_analysis', {})
         engagement_data = analysis_results.get('engagement_analysis', {})
+        schedule_data = analysis_results.get('schedule_patterns', {})
         
-        behavioral_patterns = {
+        enhanced_behavioral_patterns = {
             'emotional_tendency': sentiment_data.get('overall_sentiment', 'neutral'),
             'communication_style': self._determine_communication_style(sentiment_data, hashtag_data),
             'engagement_preference': engagement_data.get('audience_response_sentiment', 'neutral'),
-            'content_frequency': self._estimate_content_frequency(analysis_results)
+            'content_frequency': self._estimate_content_frequency(analysis_results),
+            
+            # NEW: Schedule-based behavioral patterns
+            'temporal_signature': schedule_data.get('post_timing', {}).get('temporal_signature', 'unknown'),
+            'activity_rhythm': schedule_data.get('activity_frequency', {}).get('engagement_rhythm', 'unknown'),
+            'geographic_scope': schedule_data.get('geographic_inference', {}).get('geographic_scope', 'unknown'),
+            'work_life_balance': schedule_data.get('work_personal_boundary', {}).get('boundary_clarity', 'unknown'),
+            'schedule_consistency': schedule_data.get('post_timing', {}).get('consistency_score', 0.0),
+            'privacy_awareness': len([i for i in schedule_data.get('privacy_implications', []) if '✅' in i]) > 0,
+            'posting_frequency': schedule_data.get('post_timing', {}).get('posting_frequency', 'unknown'),
+            'peak_activity_hours': schedule_data.get('post_timing', {}).get('peak_hours', []),
+            'time_zone_indicators': schedule_data.get('post_timing', {}).get('time_zone_indicators', [])
         }
         
-        # Content preferences
+        # Enhanced content preferences with schedule insights
         content_preferences = {
             'preferred_sentiment': sentiment_data.get('overall_sentiment', 'neutral'),
             'hashtag_usage': hashtag_data.get('usage_style', 'minimal'),
             'interaction_style': analysis_results.get('mention_patterns', {}).get('interaction_style', 'non_interactive'),
-            'topic_diversity': topic_data.get('topic_diversity', 0.0)
+            'topic_diversity': topic_data.get('topic_diversity', 0.0),
+            
+            # NEW: Schedule-based preferences
+            'preferred_posting_times': schedule_data.get('post_timing', {}).get('peak_hours', []),
+            'geographic_preferences': schedule_data.get('geographic_inference', {}).get('likely_locations', []),
+            'work_content_ratio': schedule_data.get('work_personal_boundary', {}).get('professional_content_ratio', 0.0)
         }
         
-        # Engagement style
-        engagement_style = self._determine_engagement_style(engagement_data, behavioral_patterns)
+        # Enhanced engagement style determination
+        engagement_style = self._determine_enhanced_engagement_style(
+            engagement_data, enhanced_behavioral_patterns, schedule_data
+        )
         
         return InterestProfile(
             primary_interests=primary_interests,
             interest_scores=interest_scores,
             interest_evolution={},  # Would require historical data
-            behavioral_patterns=behavioral_patterns,
+            behavioral_patterns=enhanced_behavioral_patterns,
             content_preferences=content_preferences,
             engagement_style=engagement_style
         )
@@ -986,21 +1051,42 @@ class AIInferenceEngine:
         else:
             return 'minimal'
     
-    def _determine_engagement_style(self, engagement_data: Dict, behavioral_patterns: Dict) -> str:
-        """Determine overall engagement style"""
+    def _determine_enhanced_engagement_style(self, engagement_data: Dict, 
+                                           behavioral_patterns: Dict,
+                                           schedule_data: Dict) -> str:
+        """Determine enhanced engagement style including schedule patterns"""
         
         engagement_rate = engagement_data.get('engagement_rate', 0.0)
         viral_potential = engagement_data.get('viral_potential', 0.0)
         communication_style = behavioral_patterns.get('communication_style', 'balanced')
         
+        # NEW: Schedule-based factors
+        temporal_signature = behavioral_patterns.get('temporal_signature', 'unknown')
+        activity_rhythm = behavioral_patterns.get('activity_rhythm', 'unknown')
+        consistency_score = behavioral_patterns.get('schedule_consistency', 0.0)
+        
+        # Enhanced engagement style determination
         if engagement_rate > 0.7 and viral_potential > 0.5:
-            return 'influencer'
+            if consistency_score > 0.7:
+                return 'professional_influencer'
+            else:
+                return 'viral_influencer'
         elif engagement_rate > 0.5:
-            return 'active'
+            if 'business_hours' in temporal_signature:
+                return 'business_active'
+            elif activity_rhythm == 'bursty':
+                return 'spontaneous_active'
+            else:
+                return 'active'
         elif communication_style == 'enthusiastic':
             return 'social'
         elif communication_style == 'factual':
-            return 'informative'
+            if 'consistent' in temporal_signature:
+                return 'professional_informative'
+            else:
+                return 'informative'
+        elif consistency_score > 0.6:
+            return 'scheduled_poster'
         else:
             return 'casual'
     
@@ -1028,12 +1114,31 @@ class AIInferenceEngine:
                 'primary_topics': [],
                 'topic_diversity': 0.0
             },
+            'schedule_patterns': {
+                'post_timing': {},
+                'activity_frequency': {},
+                'geographic_inference': {},
+                'work_personal_boundary': {},
+                'overall_schedule_score': 0.0,
+                'behavioral_insights': [],
+                'privacy_implications': [],
+                'analysis_completed': False
+            },
             'interest_profile': asdict(InterestProfile([], {}, {}, {}, {}, 'minimal')),
             'analysis_metadata': {
                 'content_analyzed': 0,
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '1.0',
-                'note': 'Insufficient content for comprehensive analysis'
+                'analysis_version': '2.0',
+                'note': 'Insufficient content for comprehensive analysis',
+                'features': [
+                    'sentiment_analysis',
+                    'hashtag_patterns', 
+                    'mention_patterns',
+                    'engagement_analysis',
+                    'topic_modeling',
+                    'schedule_patterns',
+                    'interest_profile'
+                ]
             }
         }
 
