@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 import uuid
 import re
 from dotenv import load_dotenv
+from utils.data_sanitization import DataSanitizationLayer
+from utils.authentication import SecureAuthenticationSystem, auth_required
 
 # Load environment variables
 load_dotenv()
@@ -25,6 +27,12 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# Initialize the authentication system
+auth_system = SecureAuthenticationSystem()
+
+# Initialize authentication system with app
+auth_system.init_app(app)
 
 # Rate limiting - FIXED VERSION
 limiter = Limiter(
@@ -50,9 +58,15 @@ class User(UserMixin, db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     verified = db.Column(db.Boolean, default=False)
     verification_token = db.Column(db.String(36))
+    is_active = db.Column(db.Boolean, default=True)
+    password_changed_at = db.Column(db.DateTime)
+    last_login_at = db.Column(db.DateTime)
+    failed_login_attempts = db.Column(db.Integer, default=0)
+    locked_until = db.Column(db.DateTime)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -86,131 +100,199 @@ def health_check():
 
 
 @app.route('/api/register', methods=['POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("3 per minute")
 def register():
-    data = request.get_json()
-
-    # Validate input
-    email = data.get('email', '').lower().strip()
-    password = data.get('password', '')
-
-    if not email or not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
-        return jsonify({'error': 'Invalid email format'}), 400
-
-    if len(password) < 8:
-        return jsonify({'error': 'Password must be at least 8 characters'}), 400
-
-    # Check if user exists
-    if User.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email already registered'}), 400
-
-    # Create user
-    user = User(
-        email=email,
-        verification_token=str(uuid.uuid4()),
-        verified=True  # Auto-verify for development
-    )
-    user.set_password(password)
-
     try:
-        db.session.add(user)
-        db.session.commit()
-
-        return jsonify({
-            'message': 'Registration successful',
-            'user_id': user.id
-        }), 201
-
+        data = request.get_json()
+        
+        # Use secure authentication system
+        result = auth_system.register_user(
+            email=data.get('email', ''),
+            password=data.get('password', ''),
+            name=data.get('name', '')
+        )
+        
+        if result['success']:
+            return jsonify({
+                'message': 'Registration successful',
+                'user_id': result['user_id'],
+                'requires_verification': result.get('requires_verification', False)
+            }), 201
+        else:
+            return jsonify({'error': result['error']}), 400          
     except Exception as e:
-        db.session.rollback()
+        logger.error(f"Registration error: {str(e)}")
         return jsonify({'error': 'Registration failed'}), 500
 
 
 @app.route('/api/login', methods=['POST'])
-@limiter.limit("10 per minute")
+@limiter.limit("5 per minute")
 def login():
-    data = request.get_json()
-    email = data.get('email', '').lower().strip()
-    password = data.get('password', '')
-
-    user = User.query.filter_by(email=email).first()
-
-    if user and user.check_password(password) and user.verified:
-        login_user(user)
-        return jsonify({
-            'message': 'Login successful',
-            'user': {
-                'id': user.id,
-                'email': user.email
-            }
-        }), 200
-
-    return jsonify({'error': 'Invalid credentials'}), 401
+    try:
+        data = request.get_json()
+        
+        result = auth_system.authenticate_user(
+            email=data.get('email', ''),
+            password=data.get('password', ''),
+            remember=data.get('remember', False)
+        )
+        
+        if result['success']:
+            return jsonify({
+                'message': 'Login successful',
+                'user_id': result['user_id'],
+                'session_token': result['session_token'],
+                'expires_at': result['expires_at'].isoformat()
+            }), 200
+        else:
+            return jsonify({'error': result['error']}), 401
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        return jsonify({'error': 'Login failed'}), 500
 
 
 @app.route('/api/logout', methods=['POST'])
-@login_required
+@auth_required
 def logout():
-    logout_user()
-    return jsonify({'message': 'Logged out successfully'}), 200
+    try:
+        result = auth_system.logout_user()
+        
+        if result['success']:
+            return jsonify({'message': 'Logged out successfully'}), 200
+        else:
+            return jsonify({'error': result['error']}), 500
+            
+    except Exception as e:
+        logger.error(f"Logout error: {str(e)}")
+        return jsonify({'error': 'Logout failed'}), 500
+    
+
+@app.route('/api/change-password', methods=['POST'])
+@auth_required
+def change_password():
+    try:
+        data = request.get_json()
+        
+        result = auth_system.change_password(
+            user_id=current_user.id,
+            current_password=data.get('current_password', ''),
+            new_password=data.get('new_password', '')
+        )
+        
+        if result['success']:
+            return jsonify({'message': 'Password changed successfully'}), 200
+        else:
+            return jsonify({'error': result['error']}), 400
+            
+    except Exception as e:
+        logger.error(f"Password change error: {str(e)}")
+        return jsonify({'error': 'Password change failed'}), 500
 
 
 @app.route('/api/analyze', methods=['POST'])
 @login_required
 @limiter.limit("3 per day")
 def start_analysis():
-    data = request.get_json()
-
-    target_email = data.get('email', '').lower().strip()
-    target_name = data.get('name', '').strip()
-    social_links = data.get('social_links', [])
-
-    # Validation
-    if not target_email or not re.match(r'^[^@]+@[^@]+\.[^@]+$', target_email):
-        return jsonify({'error': 'Invalid email format'}), 400
-
-    # Authorization check - users can only analyze their own email
-    if target_email != current_user.email:
-        return jsonify({'error': 'You can only analyze your own digital footprint'}), 403
-
-    # Check for existing recent analysis
-    recent_analysis = Analysis.query.filter_by(
-        user_id=current_user.id,
-        target_email=target_email
-    ).filter(Analysis.created_at > datetime.utcnow() - timedelta(hours=1)).first()
-
-    if recent_analysis and not recent_analysis.is_expired():
-        return jsonify({'error': 'Please wait before running another analysis'}), 429
-
-    # Create analysis record
-    analysis = Analysis(
-        user_id=current_user.id,
-        target_email=target_email,
-        status='processing'
-    )
-
+    sanitizer = DataSanitizationLayer()
+    
     try:
+        # Get and sanitize input data
+        raw_data = request.get_json()
+        if not raw_data:
+            return jsonify({'error': 'No input data provided'}), 400
+        
+        # Sanitize all inputs
+        sanitized_data = sanitizer.sanitize_analysis_request(raw_data)
+        tracking_id = sanitized_data['tracking_id']
+        
+        # Extract sanitized values
+        target_name = sanitized_data['name']
+        target_email = sanitized_data['email'] 
+        social_links = sanitized_data['social_links']
+        
+        # Authorization check - users can only analyze their own email
+        if target_email != current_user.email:
+            sanitizer.cleanup_temporary_data(tracking_id)  # Clean up immediately
+            return jsonify({'error': 'You can only analyze your own digital footprint'}), 403
+        
+        # Check for existing recent analysis
+        recent_analysis = Analysis.query.filter_by(
+            user_id=current_user.id,
+            target_email=target_email
+        ).filter(Analysis.created_at > datetime.utcnow() - timedelta(hours=1)).first()
+        
+        if recent_analysis and not recent_analysis.is_expired():
+            sanitizer.cleanup_temporary_data(tracking_id)  # Clean up immediately
+            return jsonify({'error': 'Please wait before running another analysis'}), 429
+        
+        # Create analysis record (no sensitive data stored)
+        analysis = Analysis(
+            user_id=current_user.id,
+            target_email=target_email,  # Only email stored, already validated
+            status='processing'
+        )
+        
         db.session.add(analysis)
         db.session.commit()
-
-        # Perform the analysis
+        
+        # Perform the analysis (sensitive data handled in memory only)
         from utils.analyzer import perform_analysis
-        results = perform_analysis(target_name, target_email, social_links)
-
-        analysis.results = results
+        raw_results = perform_analysis(target_name, target_email, social_links)
+        
+        # Sanitize results before storage/return
+        sanitized_results = sanitizer.sanitize_analysis_results(raw_results)
+        
+        # Store only sanitized results
+        analysis.results = sanitized_results
         analysis.status = 'completed'
         db.session.commit()
-
+        
+        # Clean up temporary data immediately after processing
+        sanitizer.cleanup_temporary_data(tracking_id)
+        
         return jsonify({
             'analysis_id': analysis.id,
             'status': 'completed',
-            'results': results
+            'results': sanitized_results
         }), 200
+        
+    except ValueError as e:
+        # Clean up on validation error
+        if 'tracking_id' in locals():
+            sanitizer.cleanup_temporary_data(tracking_id)
+        return jsonify({'error': str(e)}), 400
+        
+    except Exception as e:
+        # Clean up on any error
+        if 'tracking_id' in locals():
+            sanitizer.cleanup_temporary_data(tracking_id)
+        db.session.rollback()
+        logger.error(f"Analysis error: {str(e)}")
+        return jsonify({'error': 'Analysis failed to complete'}), 500
 
+@app.route('/api/cleanup', methods=['POST'])
+def cleanup_expired_data():
+    """Remove expired analyses and temporary data"""
+    try:
+        # Clean expired database records
+        expired_analyses = Analysis.query.filter(Analysis.expires_at < datetime.utcnow()).all()
+        for analysis in expired_analyses:
+            db.session.delete(analysis)
+        
+        # Clean temporary sanitization data
+        sanitizer = DataSanitizationLayer()
+        cleaned_temp = sanitizer.cleanup_temporary_data()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'Cleaned up {len(expired_analyses)} expired analyses and {cleaned_temp} temporary data entries'
+        }), 200
+        
     except Exception as e:
         db.session.rollback()
-        print(f"Analysis error: {str(e)}")
-        return jsonify({'error': 'Analysis failed to complete'}), 500
+        logger.error(f"Cleanup failed: {str(e)}")
+        return jsonify({'error': 'Cleanup failed'}), 500
 
 # Initialize database tables
 @app.before_first_request

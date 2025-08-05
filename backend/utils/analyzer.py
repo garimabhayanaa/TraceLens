@@ -11,11 +11,13 @@ import time
 from collections import Counter
 from .data_collector import DataCollectionEngine
 from .ml_inference import MLInferencePipeline
+from .privacy_scoring import AdvancedPrivacyScoring
 
 class DigitalFootprintAnalyzer:
     def __init__(self):
         self.data_collector = DataCollectionEngine()
         self.ml_pipeline = MLInferencePipeline()
+        self.privacy_scorer = AdvancedPrivacyScoring()  # Add advanced privacy scoring
         self.interest_keywords = {
             'technology': ['tech', 'programming', 'coding', 'software', 'AI', 'machine learning', 'developer', 'github',
                           'python', 'javascript', 'react', 'nodejs', 'api', 'database', 'cloud', 'cybersecurity'],
@@ -54,7 +56,7 @@ class DigitalFootprintAnalyzer:
         }
 
     def analyze_public_profiles(self, name, email, social_links):
-        """Main analysis function using ML Inference Pipeline"""
+        """Main analysis function using ML Inference Pipeline and Advanced Privacy Scoring"""
         
         # Collect raw data
         collected_data = self.data_collector.collect_public_data(name, email, social_links)
@@ -74,7 +76,7 @@ class DigitalFootprintAnalyzer:
         ml_results = self.ml_pipeline.analyze_text_patterns(text_data)
         
         results = {
-            'privacy_score': 8.0,  # Start with high privacy score
+            'privacy_score': 8.0,  # Will be replaced by advanced scoring
             'interests': [],
             'schedule_patterns': {},
             'economic_indicators': {},
@@ -102,7 +104,6 @@ class DigitalFootprintAnalyzer:
         results['data_sources'].append('Email Domain Analysis')
         
         if email_data['domain_type'] == 'privacy_focused':
-            results['privacy_score'] += 0.5
             results['interests'].append('privacy/security')
             results['economic_indicators']['privacy_conscious'] = 'high'
         elif email_data['domain_type'] == 'corporate':
@@ -117,9 +118,6 @@ class DigitalFootprintAnalyzer:
         # Process social profile data
         for profile in collected_data['social_profiles']:
             results['data_sources'].append(f"{profile['platform'].title()} Profile Analysis")
-            
-            # Apply privacy score impact
-            results['privacy_score'] += profile.get('privacy_score_impact', 0)
             
             # Extract platform-specific insights
             if profile['platform'] == 'linkedin':
@@ -206,16 +204,25 @@ class DigitalFootprintAnalyzer:
         # Apply additional analysis based on collected data patterns
         self._apply_pattern_analysis(results, collected_data)
         
-        # Ensure privacy score stays within bounds
-        results['privacy_score'] = max(1.0, min(10.0, results['privacy_score']))
-        
         # Remove duplicate interests
         results['interests'] = list(set(results['interests']))
+        
+        # Calculate comprehensive privacy scoring using advanced algorithms
+        privacy_analysis = self.privacy_scorer.calculate_comprehensive_privacy_score(results)
+        
+        # Update results with enhanced privacy scoring
+        results['privacy_score'] = privacy_analysis['overall_privacy_score']
+        results['privacy_grade'] = privacy_analysis['privacy_grade']
+        results['risk_breakdown'] = privacy_analysis['risk_breakdown']
+        results['improvement_potential'] = privacy_analysis['improvement_potential']
+        results['critical_risks'] = privacy_analysis['critical_risks']
+        results['privacy_confidence_intervals'] = privacy_analysis['confidence_intervals']
+        results['privacy_metadata'] = privacy_analysis['scoring_metadata']
         
         # Generate confidence levels
         results['confidence_levels'] = self._calculate_confidence_levels(results)
         
-        # Generate recommendations
+        # Generate recommendations with privacy-aware insights
         results['recommendations'] = self._generate_recommendations(results)
         
         return results
@@ -296,7 +303,6 @@ class DigitalFootprintAnalyzer:
         
         if len(platforms) > 3:
             results['economic_indicators']['platform_diversity'] = 'high'
-            results['privacy_score'] -= 0.5  # More platforms = more exposure
         
         # Analyze name consistency
         name_data = collected_data['name_analysis']
@@ -309,37 +315,6 @@ class DigitalFootprintAnalyzer:
             results['economic_indicators']['professional_consistency'] = 'high'
             results['confidence_levels'] = results.get('confidence_levels', {})
             results['confidence_levels']['employment_status'] = 85
-    
-    def _calculate_privacy_score(self, results):
-        """Calculate privacy risk score (1-10, higher = more private)"""
-        score = 10.0  # Start with maximum privacy
-        
-        # Reduce score based on data exposure
-        if len(results['interests']) > 5:
-            score -= 1.5  # Many interests revealed
-        elif len(results['interests']) > 2:
-            score -= 0.5
-        
-        if len(results['schedule_patterns']) > 3:
-            score -= 2.0  # Detailed schedule patterns detectable
-        elif len(results['schedule_patterns']) > 0:
-            score -= 1.0
-        
-        if len(results['economic_indicators']) > 3:
-            score -= 2.5  # Economic status highly inferable
-        elif len(results['economic_indicators']) > 0:
-            score -= 1.0
-        
-        if len(results['data_sources']) > 3:
-            score -= 1.5  # Multiple data sources increase correlation risk
-        elif len(results['data_sources']) > 1:
-            score -= 0.5
-        
-        # Bonus points for privacy-conscious behavior
-        if any('privacy' in str(value).lower() for value in results['economic_indicators'].values()):
-            score += 0.5
-        
-        return max(1.0, min(10.0, score))  # Keep score between 1-10
     
     def _calculate_confidence_levels(self, results):
         """Calculate confidence levels for different analysis categories"""
@@ -369,6 +344,13 @@ class DigitalFootprintAnalyzer:
         else:
             confidence['mental_state'] = 10
         
+        # Privacy scoring confidence
+        if 'privacy_confidence_intervals' in results:
+            avg_confidence = np.mean([abs(upper - lower) for lower, upper in results['privacy_confidence_intervals'].values()])
+            confidence['privacy_scoring'] = max(50, int(100 - avg_confidence * 20))
+        else:
+            confidence['privacy_scoring'] = 70
+        
         # Overall confidence based on data sources and collection success
         if 'collection_summary' in results:
             success_rate = results['collection_summary'].get('success_rate', 0)
@@ -384,40 +366,44 @@ class DigitalFootprintAnalyzer:
         return confidence
     
     def _generate_recommendations(self, results):
-        """Generate privacy improvement recommendations"""
+        """Generate privacy improvement recommendations with advanced insights"""
         recommendations = []
         
-        # Score-based recommendations
-        if results['privacy_score'] < 4:
+        # Privacy grade-based recommendations
+        privacy_grade = results.get('privacy_grade', 'C')
+        if privacy_grade in ['F', 'D', 'D+']:
             recommendations.append(
                 "🚨 CRITICAL: Your privacy score is very low. Immediate action required to protect your digital footprint.")
-        elif results['privacy_score'] < 6:
+        elif privacy_grade in ['C-', 'C', 'C+']:
             recommendations.append(
                 "⚠️ WARNING: Your privacy score indicates significant risks. Review your online presence carefully.")
-        elif results['privacy_score'] < 8:
+        elif privacy_grade in ['B-', 'B', 'B+']:
             recommendations.append("📋 Your privacy could be improved. Consider implementing the recommendations below.")
         else:
             recommendations.append("✅ Good privacy practices detected, but there's always room for improvement.")
         
-        # Interest-based recommendations
-        if len(results['interests']) > 5:
-            recommendations.append(
-                "🎯 Many personal interests are publicly visible. Consider limiting personal details in your profiles and posts.")
+        # Critical risk-based recommendations
+        critical_risks = results.get('critical_risks', [])
+        for risk in critical_risks:
+            if risk == 'data_exposure':
+                recommendations.append("🔴 CRITICAL: Too much personal data is publicly exposed. Review what information you share online.")
+            elif risk == 'correlation_risk':
+                recommendations.append("🔴 CRITICAL: High risk of cross-platform data correlation. Use different usernames and limit connections.")
+            elif risk == 'behavioral_patterns':
+                recommendations.append("🔴 CRITICAL: Your behavior patterns are highly predictable. Vary your online activities.")
+            elif risk == 'economic_inference':
+                recommendations.append("🔴 CRITICAL: Your economic status is easily inferable. Limit financial and lifestyle information sharing.")
         
-        # Schedule pattern recommendations
-        if len(results['schedule_patterns']) > 2:
-            recommendations.append(
-                "⏰ Your activity patterns are highly predictable. Vary your posting times and online activity for better privacy.")
-        
-        # Economic indicator recommendations
-        if len(results['economic_indicators']) > 3:
-            recommendations.append(
-                "💰 Significant economic information can be inferred about you. Be cautious about sharing lifestyle and purchase information.")
-        
-        # Data source recommendations
-        if len(results['data_sources']) > 3:
-            recommendations.append(
-                "🔗 Information from multiple platforms can be easily correlated. Consider using different usernames and limiting cross-platform connections.")
+        # Risk breakdown-based recommendations
+        risk_breakdown = results.get('risk_breakdown', {})
+        for category, risk_info in risk_breakdown.items():
+            if risk_info.get('risk_level') == 'High Risk':
+                if category == 'social_patterns':
+                    recommendations.append("📱 Your social behavior patterns reveal personal information. Consider limiting social interactions visibility.")
+                elif category == 'communication_style':
+                    recommendations.append("💬 Your communication patterns are identifiable. Vary your writing style across platforms.")
+                elif category == 'temporal_patterns':
+                    recommendations.append("⏰ Your time-based activities are predictable. Change your posting schedule regularly.")
         
         # ML-based recommendations
         if 'ml_analysis' in results:
@@ -453,7 +439,7 @@ class DigitalFootprintAnalyzer:
             recommendations.append(
                 "📸 Your Instagram reveals lifestyle and location patterns. Disable location services and review story visibility.")
         
-        # General recommendations (always include)
+        # General recommendations (always include most relevant ones)
         general_recommendations = [
             "🔒 Regularly review and update privacy settings on all your social media platforms",
             "👤 Use different profile pictures and usernames across platforms to prevent easy correlation",
