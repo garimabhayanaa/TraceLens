@@ -10,10 +10,12 @@ from urllib.parse import urlparse
 import time
 from collections import Counter
 from .data_collector import DataCollectionEngine
+from .ml_inference import MLInferencePipeline
 
 class DigitalFootprintAnalyzer:
     def __init__(self):
         self.data_collector = DataCollectionEngine()
+        self.ml_pipeline = MLInferencePipeline()
         self.interest_keywords = {
             'technology': ['tech', 'programming', 'coding', 'software', 'AI', 'machine learning', 'developer', 'github',
                           'python', 'javascript', 'react', 'nodejs', 'api', 'database', 'cloud', 'cybersecurity'],
@@ -52,11 +54,24 @@ class DigitalFootprintAnalyzer:
         }
 
     def analyze_public_profiles(self, name, email, social_links):
-        """Main analysis function using the Data Collection Engine"""
+        """Main analysis function using ML Inference Pipeline"""
         
-        # Use the data collection engine
+        # Collect raw data
         collected_data = self.data_collector.collect_public_data(name, email, social_links)
         collection_summary = self.data_collector.get_collection_summary(collected_data)
+        
+        # Prepare text data for ML analysis
+        text_data = []
+        text_data.append(f"{name} {email}")  # Basic info
+        
+        for profile in collected_data['social_profiles']:
+            if 'page_title' in profile:
+                text_data.append(profile['page_title'])
+            if 'description' in profile:
+                text_data.append(profile['description'])
+        
+        # Run ML inference pipeline
+        ml_results = self.ml_pipeline.analyze_text_patterns(text_data)
         
         results = {
             'privacy_score': 8.0,  # Start with high privacy score
@@ -67,8 +82,12 @@ class DigitalFootprintAnalyzer:
             'data_sources': [],
             'recommendations': [],
             'confidence_levels': {},
-            'collection_summary': collection_summary
+            'collection_summary': collection_summary,
+            'ml_analysis': ml_results  # Include raw ML results
         }
+        
+        # Process ML results into standard format
+        self._process_ml_results(results, ml_results)
         
         # Process name analysis
         name_data = collected_data['name_analysis']
@@ -124,7 +143,7 @@ class DigitalFootprintAnalyzer:
                 results['economic_indicators']['technical_skills'] = 'demonstrated'
                 
                 # Use actual GitHub data if available
-                if 'public_repos' in profile['inferred_data']:
+                if 'public_repos' in profile.get('inferred_data', {}):
                     repos = profile['inferred_data']['public_repos']
                     if repos > 20:
                         results['economic_indicators']['project_experience'] = 'extensive'
@@ -132,7 +151,7 @@ class DigitalFootprintAnalyzer:
                     elif repos > 5:
                         results['economic_indicators']['project_experience'] = 'moderate'
                         results['schedule_patterns']['coding_activity'] = 'regular'
-                    
+                        
                     if profile['inferred_data'].get('followers', 0) > 50:
                         results['mental_state']['technical_reputation'] = 'established'
                 
@@ -201,6 +220,74 @@ class DigitalFootprintAnalyzer:
         
         return results
     
+    def _process_ml_results(self, results, ml_results):
+        """Process ML inference results into standard format"""
+        
+        # Process sentiment and emotion analysis
+        sentiment = ml_results.get('sentiment_analysis', {})
+        emotion = ml_results.get('emotion_analysis', {})
+        
+        if sentiment:
+            results['mental_state'].update({
+                'sentiment': sentiment.get('overall_sentiment', 'neutral'),
+                'sentiment_confidence': sentiment.get('confidence', 0.5)
+            })
+        
+        if emotion:
+            results['mental_state'].update({
+                'primary_emotion': emotion.get('primary_emotion', 'neutral'),
+                'emotion_confidence': emotion.get('confidence', 0.5)
+            })
+        
+        # Process interests from ML
+        interest_data = ml_results.get('interest_inference', {})
+        if interest_data and 'interests' in interest_data:
+            for interest in interest_data['interests']:
+                if isinstance(interest, dict) and 'category' in interest:
+                    results['interests'].append(interest['category'])
+                elif isinstance(interest, str):
+                    results['interests'].append(interest)
+        
+        # Process personality traits
+        personality = ml_results.get('personality_traits', {}).get('traits', {})
+        for trait, info in personality.items():
+            if isinstance(info, dict) and info.get('score', 0) > 0.5:
+                results['mental_state'][f'personality_{trait}'] = f"score: {info['score']:.2f}"
+        
+        # Process behavioral patterns
+        behavioral = ml_results.get('behavioral_patterns', {}).get('patterns', {})
+        if isinstance(behavioral, dict):
+            for key, value in behavioral.items():
+                if isinstance(value, dict):
+                    results['schedule_patterns'][key] = str(value)
+                else:
+                    results['schedule_patterns'][key] = str(value)
+        
+        # Process economic indicators from ML
+        economic = ml_results.get('economic_indicators', {}).get('indicators', {})
+        for indicator, info in economic.items():
+            if isinstance(info, dict) and info.get('score', 0) > 0.3:
+                results['economic_indicators'][indicator] = f"confidence: {info['score']:.2f}"
+        
+        # Process schedule patterns from ML
+        schedule = ml_results.get('schedule_patterns', {}).get('patterns', {})
+        for pattern, info in schedule.items():
+            if isinstance(info, dict) and info.get('score', 0) > 0.3:
+                results['schedule_patterns'][pattern] = f"detected: {info['score']:.2f}"
+        
+        # Process communication style
+        comm_style = ml_results.get('communication_style', {})
+        if comm_style and 'style' in comm_style:
+            results['mental_state']['communication_style'] = comm_style['style']
+        
+        # Process social patterns
+        social = ml_results.get('social_patterns', {})
+        if social and 'orientation' in social:
+            results['mental_state']['social_orientation'] = social['orientation']
+        
+        # Update data sources
+        results['data_sources'].append('ML Pattern Analysis')
+    
     def _apply_pattern_analysis(self, results, collected_data):
         """Apply cross-platform pattern analysis"""
         
@@ -213,7 +300,7 @@ class DigitalFootprintAnalyzer:
         
         # Analyze name consistency
         name_data = collected_data['name_analysis']
-        if name_data['name_complexity']['has_special_chars']:
+        if name_data.get('name_complexity', {}).get('has_special_chars', False):
             results['mental_state']['username_creativity'] = 'high'
         
         # Cross-reference email and social patterns
@@ -289,6 +376,11 @@ class DigitalFootprintAnalyzer:
         else:
             confidence['overall'] = sum(confidence.values()) / len(confidence) if confidence else 20
         
+        # Include ML confidence if available
+        if 'ml_analysis' in results and 'confidence_scores' in results['ml_analysis']:
+            ml_confidence = results['ml_analysis']['confidence_scores'].get('overall', 0.5)
+            confidence['ml_analysis'] = int(ml_confidence * 100)
+        
         return confidence
     
     def _generate_recommendations(self, results):
@@ -326,6 +418,22 @@ class DigitalFootprintAnalyzer:
         if len(results['data_sources']) > 3:
             recommendations.append(
                 "🔗 Information from multiple platforms can be easily correlated. Consider using different usernames and limiting cross-platform connections.")
+        
+        # ML-based recommendations
+        if 'ml_analysis' in results:
+            ml_results = results['ml_analysis']
+            
+            # Sentiment-based recommendations
+            sentiment = ml_results.get('sentiment_analysis', {}).get('overall_sentiment', '')
+            if sentiment == 'negative':
+                recommendations.append(
+                    "😟 Your online content shows negative sentiment patterns. Consider reviewing your public posts for emotional tone.")
+            
+            # Communication style recommendations
+            comm_style = ml_results.get('communication_style', {}).get('style', '')
+            if comm_style == 'informal':
+                recommendations.append(
+                    "💬 Your communication style is very informal. Consider more professional language for work-related platforms.")
         
         # Platform-specific recommendations
         data_sources_str = ' '.join(results['data_sources']).lower()
@@ -366,3 +474,4 @@ def perform_analysis(name, email, social_links):
     """Entry point for analysis - called from Flask app"""
     analyzer = DigitalFootprintAnalyzer()
     return analyzer.analyze_public_profiles(name, email, social_links)
+

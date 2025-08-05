@@ -25,6 +25,7 @@ ordered-set==4.1.0
 packaging==25.0
 pandas==2.3.1
 pip==25.1.1
+psycopg2-binary
 Pygments==2.19.2
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
@@ -40,7 +41,11 @@ soupsieve==2.7
 SQLAlchemy==2.0.42
 textblob==0.19.0
 threadpoolctl==3.6.0
+torch
+torchaudio
+torchvision
 tqdm==4.67.1
+transformers
 typing_extensions==4.14.1
 tzdata==2025.2
 urllib3==2.5.0
