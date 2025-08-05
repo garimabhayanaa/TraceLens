@@ -25,6 +25,7 @@ import {
   ChatBubbleLeftRightIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
+import api from '../utils/api'
 
 ChartJS.register(
   CategoryScale,
@@ -67,10 +68,10 @@ export default function Dashboard() {
         .map(link => link.trim())
         .filter(link => link.length > 0)
 
-      const response = await axios.post('/api/analyze', {
-        ...formData,
-        social_links: socialLinks
-      })
+        const response = await api.post('/api/analyze', {
+          ...formData,
+          social_links: socialLinks
+        })
       
       setResults(response.data.results)
       toast.success('Analysis complete!')
@@ -84,7 +85,7 @@ export default function Dashboard() {
 
   const handleLogout = async () => {
     try {
-      await axios.post('/api/logout')
+      await api.post('/api/logout')
       toast.success('Logged out successfully')
       router.push('/')
     } catch (err) {

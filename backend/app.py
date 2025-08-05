@@ -33,9 +33,17 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"]
 )
 
-# CORS for development
-CORS(app, origins=["http://localhost:3000"], supports_credentials=True)
+# CORS for production
+allowed_origins = [
+    "http://localhost:3000",  # Development
+    "https://your-app-name.vercel.app",  # Replace with your actual Vercel URL
+]
 
+if os.environ.get('FLASK_ENV') == 'production':
+    # Add your production frontend URL
+    allowed_origins.append(os.environ.get('FRONTEND_URL', ''))
+
+CORS(app, origins=allowed_origins, supports_credentials=True)
 
 # Database Models
 class User(UserMixin, db.Model):
@@ -203,6 +211,16 @@ def start_analysis():
         db.session.rollback()
         print(f"Analysis error: {str(e)}")
         return jsonify({'error': 'Analysis failed to complete'}), 500
+
+# Initialize database tables
+@app.before_first_request
+def create_tables():
+    db.create_all()
+
+# Health check for deployment
+@app.route('/health')
+def health():
+    return jsonify({'status': 'healthy', 'service': 'leakpeek-backend'})
 
 
 if __name__ == '__main__':

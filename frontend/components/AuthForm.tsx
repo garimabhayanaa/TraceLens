@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import { useRouter } from 'next/router'
+import api from '../utils/api'
 
 export default function AuthForm() {
   const [isLogin, setIsLogin] = useState(true)
@@ -16,7 +17,7 @@ export default function AuthForm() {
   const onSubmit = async (data: any) => {
     try {
       const url = isLogin ? '/api/login' : '/api/register'
-      const response = await axios.post(url, data)
+      const response = await api.post(url, data)
       toast.success(response.data.message || 'Success')
 
       if (isLogin) {
