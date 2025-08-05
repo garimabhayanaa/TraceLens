@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import threading
 from .schedule_pattern_detector import create_schedule_pattern_detector
 from .economic_indicators_analyzer import create_economic_indicators_analyzer
+from .mental_state_analyzer import create_mental_state_analyzer
 
 # ML and NLP imports
 try:
@@ -670,7 +671,7 @@ class TopicModelingEngine:
             return "General Topics"
 
 class AIInferenceEngine:
-    """Main AI inference engine combining all analysis components including economic indicators"""
+    """Main AI inference engine combining all analysis components including mental state assessment"""
     
     def __init__(self):
         self.sentiment_analyzer = SentimentAnalyzer()
@@ -678,14 +679,15 @@ class AIInferenceEngine:
         self.engagement_analyzer = EngagementAnalyzer()
         self.topic_engine = TopicModelingEngine()
         self.schedule_detector = create_schedule_pattern_detector()  # Schedule pattern detector
-        self.economic_analyzer = create_economic_indicators_analyzer()  # NEW: Economic indicators analyzer
+        self.economic_analyzer = create_economic_indicators_analyzer()  # Economic indicators analyzer
+        self.mental_state_analyzer = create_mental_state_analyzer()  # NEW: Mental state analyzer
         self.analysis_cache = {}
         self.cache_lock = threading.RLock()
     
     def analyze_social_content(self, social_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Comprehensive AI analysis including schedule patterns and economic indicators"""
+        """Comprehensive AI analysis including schedule patterns, economic indicators, and mental state assessment"""
         
-        logger.info("Starting comprehensive AI inference analysis with schedule patterns and economic indicators")
+        logger.info("Starting comprehensive AI inference analysis with full feature set")
         
         # Extract content from social data
         content_list = self._extract_content_from_social_data(social_data)
@@ -701,12 +703,13 @@ class AIInferenceEngine:
             'engagement_analysis': self._analyze_engagement(social_data),
             'topic_modeling': self._perform_topic_modeling(content_list),
             'schedule_patterns': {},  # Schedule pattern analysis
-            'economic_indicators': {},  # NEW: Economic indicators analysis
+            'economic_indicators': {},  # Economic indicators analysis
+            'mental_state_assessment': {},  # NEW: Mental state assessment
             'interest_profile': {},
             'analysis_metadata': {
                 'content_analyzed': len(content_list),
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '3.0',  # Updated version with economic indicators
+                'analysis_version': '4.0',  # Updated version with mental state assessment
                 'features': [
                     'sentiment_analysis',
                     'hashtag_patterns', 
@@ -715,6 +718,7 @@ class AIInferenceEngine:
                     'topic_modeling',
                     'schedule_patterns',
                     'economic_indicators',
+                    'mental_state_assessment',
                     'interest_profile'
                 ]
             }
@@ -802,12 +806,90 @@ class AIInferenceEngine:
                 'privacy_economic_implications': []
             }
         
+        # MENTAL STATE ASSESSMENT
+        try:
+            logger.info("Starting comprehensive mental state assessment...")
+            mental_state_analysis = self.mental_state_analyzer.analyze_mental_state(social_data)
+            
+            analysis_results['mental_state_assessment'] = {
+                'language_patterns': asdict(mental_state_analysis.language_patterns),
+                'emoji_patterns': asdict(mental_state_analysis.emoji_patterns),
+                'social_interaction': asdict(mental_state_analysis.social_interaction),
+                'content_tone': asdict(mental_state_analysis.content_tone),
+                'risk_factors': asdict(mental_state_analysis.risk_factors),
+                'mental_state_profile': asdict(mental_state_analysis.mental_state_profile),
+                'assessment_confidence': mental_state_analysis.assessment_confidence,
+                'recommendations': mental_state_analysis.recommendations,
+                'privacy_considerations': mental_state_analysis.privacy_considerations,
+                'analysis_completed': True
+            }
+            
+            # Update metadata with mental state insights  
+            analysis_results['analysis_metadata'].update({
+                'mental_state_detected': mental_state_analysis.mental_state_profile.overall_mental_state,
+                'mental_health_risk_level': self._classify_mental_health_risk(mental_state_analysis.risk_factors),
+                'emotional_stability_score': mental_state_analysis.mental_state_profile.emotional_stability_score,
+                'social_connectivity_level': mental_state_analysis.mental_state_profile.social_connectivity_level,
+                'crisis_indicators_detected': len(mental_state_analysis.risk_factors.crisis_warning_signals) > 0,
+                'protective_factors_identified': len(mental_state_analysis.risk_factors.protective_factors)
+            })
+            
+            logger.info(f"Mental state assessment completed successfully: "
+                       f"Overall State: {mental_state_analysis.mental_state_profile.overall_mental_state}, "
+                       f"Emotional Stability: {mental_state_analysis.mental_state_profile.emotional_stability_score:.2f}, "
+                       f"Assessment Confidence: {mental_state_analysis.assessment_confidence:.2f}")
+            
+        except Exception as e:
+            logger.error(f"Mental state assessment failed: {str(e)}")
+            analysis_results['mental_state_assessment'] = {
+                'error': str(e),
+                'analysis_completed': False,
+                'language_patterns': {},
+                'emoji_patterns': {},
+                'social_interaction': {},
+                'content_tone': {},
+                'risk_factors': {},
+                'mental_state_profile': {},
+                'assessment_confidence': 0.0,
+                'recommendations': [],
+                'privacy_considerations': []
+            }
+        
         # Generate comprehensive interest profile (now including all insights)
         analysis_results['interest_profile'] = self._generate_comprehensive_interest_profile(analysis_results)
         
-        logger.info(f"Comprehensive AI analysis completed for {len(content_list)} content items with full feature set")
+        logger.info(f"Comprehensive AI analysis completed for {len(content_list)} content items with complete feature set")
         
         return analysis_results
+    
+    def _classify_mental_health_risk(self, risk_factors) -> str:
+        """Classify mental health risk level"""
+        
+        if not hasattr(risk_factors, 'depression_indicators'):
+            return 'unknown'
+        
+        try:
+            # Calculate average risk scores
+            depression_risk = np.mean(list(risk_factors.depression_indicators.values())) if risk_factors.depression_indicators else 0
+            anxiety_risk = np.mean(list(risk_factors.anxiety_indicators.values())) if risk_factors.anxiety_indicators else 0
+            stress_risk = np.mean(list(risk_factors.stress_indicators.values())) if risk_factors.stress_indicators else 0
+            
+            overall_risk = (depression_risk + anxiety_risk + stress_risk) / 3
+            
+            # Factor in crisis warnings
+            if risk_factors.crisis_warning_signals:
+                overall_risk = max(overall_risk, 0.8)
+            
+            # Classify risk
+            if overall_risk > 0.7:
+                return 'high'
+            elif overall_risk > 0.4:
+                return 'medium'
+            else:
+                return 'low'
+                
+        except Exception:
+            return 'unknown'
     
     def _extract_content_from_social_data(self, social_data: Dict[str, Any]) -> List[str]:
         """Extract text content from social media data"""
@@ -1032,6 +1114,7 @@ class AIInferenceEngine:
         sentiment_data = analysis_results.get('sentiment_analysis', {})
         engagement_data = analysis_results.get('engagement_analysis', {})
         schedule_data = analysis_results.get('schedule_patterns', {})
+        mental_state_data = analysis_results.get('mental_state_assessment', {})
         
         comprehensive_behavioral_patterns = {
             # Core behavioral patterns
@@ -1051,7 +1134,7 @@ class AIInferenceEngine:
             'peak_activity_hours': schedule_data.get('post_timing', {}).get('peak_hours', []),
             'time_zone_indicators': schedule_data.get('post_timing', {}).get('time_zone_indicators', []),
             
-            # NEW: Economic behavioral patterns
+            # Economic behavioral patterns
             'spending_capacity': economic_data.get('economic_profile', {}).get('spending_capacity', 'unknown'),
             'brand_affinity': economic_data.get('economic_profile', {}).get('brand_affinity_tier', 'unknown'),
             'purchase_style': economic_data.get('economic_profile', {}).get('purchase_decision_style', 'balanced'),
@@ -1060,7 +1143,19 @@ class AIInferenceEngine:
             'economic_risk_awareness': economic_data.get('economic_risk_score', 0.0) < 0.5,
             'brand_loyalty_tendency': self._calculate_brand_loyalty_tendency(economic_data),
             'financial_sophistication': economic_data.get('economic_profile', {}).get('financial_sophistication', 'basic'),
-            'professional_influence': economic_data.get('professional_network', {}).get('professional_influence', 0.0)
+            'professional_influence': economic_data.get('professional_network', {}).get('professional_influence', 0.0),
+            
+            # NEW: Mental state behavioral patterns
+            'overall_mental_state': mental_state_data.get('mental_state_profile', {}).get('overall_mental_state', 'stable'),
+            'emotional_stability': mental_state_data.get('mental_state_profile', {}).get('emotional_stability_score', 0.5),
+            'social_connectivity': mental_state_data.get('mental_state_profile', {}).get('social_connectivity_level', 'unknown'),
+            'stress_level': mental_state_data.get('mental_state_profile', {}).get('stress_level', 'unknown'),
+            'wellbeing_trajectory': mental_state_data.get('mental_state_profile', {}).get('wellbeing_trajectory', 'stable'),
+            'language_complexity': mental_state_data.get('language_patterns', {}).get('complexity_score', 0.0),
+            'emoji_usage_frequency': mental_state_data.get('emoji_patterns', {}).get('emoji_frequency', 0.0),
+            'social_isolation_risk': mental_state_data.get('social_interaction', {}).get('social_engagement_level', 'unknown') == 'isolated',
+            'mental_health_protective_factors': len(mental_state_data.get('risk_factors', {}).get('protective_factors', [])),
+            'crisis_risk_indicators': len(mental_state_data.get('risk_factors', {}).get('crisis_warning_signals', []))
         }
         
         # Comprehensive content preferences with all insights
@@ -1076,19 +1171,28 @@ class AIInferenceEngine:
             'geographic_preferences': schedule_data.get('geographic_inference', {}).get('likely_locations', []),
             'work_content_ratio': schedule_data.get('work_personal_boundary', {}).get('professional_content_ratio', 0.0),
             
-            # NEW: Economic content preferences
+            # Economic content preferences
             'brand_mention_frequency': len(economic_data.get('brand_mentions', [])),
             'location_sharing_tendency': len(economic_data.get('location_patterns', [])),
             'purchase_sharing_behavior': len(economic_data.get('purchase_activities', [])),
             'professional_content_ratio': economic_data.get('professional_network', {}).get('thought_leadership_score', 0.0),
             'luxury_brand_affinity': len([b for b in economic_data.get('brand_mentions', []) if b.get('price_tier') == 'luxury']),
             'economic_transparency': economic_data.get('economic_risk_score', 0.0),
-            'career_focus_level': economic_data.get('professional_network', {}).get('networking_activity', 'passive')
+            'career_focus_level': economic_data.get('professional_network', {}).get('networking_activity', 'passive'),
+            
+            # NEW: Mental state content preferences
+            'emotional_expression_frequency': mental_state_data.get('emoji_patterns', {}).get('emotional_emoji_ratio', 0.0),
+            'social_interaction_preference': mental_state_data.get('social_interaction', {}).get('interaction_rate', 0.0),
+            'language_formality_preference': mental_state_data.get('language_patterns', {}).get('formality_level', 'neutral'),
+            'content_tone_consistency': mental_state_data.get('content_tone', {}).get('tone_consistency', 0.0),
+            'wellbeing_content_sharing': len(mental_state_data.get('content_tone', {}).get('wellbeing_indicators', [])),
+            'emotional_volatility': mental_state_data.get('content_tone', {}).get('emotional_volatility', 0.0),
+            'crisis_communication_patterns': len(mental_state_data.get('risk_factors', {}).get('crisis_warning_signals', [])) > 0
         }
         
-        # Enhanced engagement style determination with economic factors
+        # Enhanced engagement style determination with all factors
         engagement_style = self._determine_comprehensive_engagement_style(
-            engagement_data, comprehensive_behavioral_patterns, schedule_data, economic_data
+            engagement_data, comprehensive_behavioral_patterns, schedule_data, economic_data, mental_state_data
         )
         
         return InterestProfile(
@@ -1153,7 +1257,8 @@ class AIInferenceEngine:
     def _determine_comprehensive_engagement_style(self, engagement_data: Dict,
                                                  behavioral_patterns: Dict,
                                                  schedule_data: Dict,
-                                                 economic_data: Dict) -> str:
+                                                 economic_data: Dict,
+                                                 mental_state_data: Dict) -> str:
         """Determine comprehensive engagement style including all factors"""
         
         engagement_rate = engagement_data.get('engagement_rate', 0.0)
@@ -1165,50 +1270,105 @@ class AIInferenceEngine:
         activity_rhythm = behavioral_patterns.get('activity_rhythm', 'unknown')
         consistency_score = behavioral_patterns.get('schedule_consistency', 0.0)
         
-        # NEW: Economic factors
+        # Economic factors
         professional_influence = behavioral_patterns.get('professional_influence', 0.0)
         spending_capacity = behavioral_patterns.get('spending_capacity', 'unknown')
         professional_level = behavioral_patterns.get('professional_level', 'unknown')
         
-        # Comprehensive engagement style determination
+        # NEW: Mental state factors
+        mental_state = behavioral_patterns.get('overall_mental_state', 'stable')
+        emotional_stability = behavioral_patterns.get('emotional_stability', 0.5)
+        social_connectivity = behavioral_patterns.get('social_connectivity', 'unknown')
+        
+        # Comprehensive engagement style determination with mental health considerations
+        
+        # Crisis or concerning mental state overrides other factors
+        if mental_state in ['critical', 'concerning']:
+            if social_connectivity == 'isolated':
+                return 'withdrawn_isolated'
+            elif emotional_stability < 0.3:
+                return 'emotionally_volatile'
+            else:
+                return 'struggling_communicator'
+        
+        # High-functioning patterns
         if professional_influence > 0.7 and professional_level in ['executive', 'senior']:
-            if consistency_score > 0.7:
-                return 'thought_leader'
+            if mental_state == 'positive' and emotional_stability > 0.7:
+                return 'influential_thought_leader'
+            elif consistency_score > 0.7:
+                return 'professional_thought_leader'
             else:
                 return 'executive_influencer'
+        
+        # Influencer patterns with mental health context
         elif engagement_rate > 0.7 and viral_potential > 0.5:
-            if spending_capacity == 'high':
+            if mental_state == 'positive' and emotional_stability > 0.6:
+                if spending_capacity == 'high':
+                    return 'balanced_luxury_influencer'
+                else:
+                    return 'stable_viral_influencer'
+            elif emotional_stability < 0.4:
+                return 'volatile_influencer'
+            elif spending_capacity == 'high':
                 return 'luxury_influencer'
-            elif consistency_score > 0.7:
-                return 'professional_influencer'
             else:
                 return 'viral_influencer'
+        
+        # Active engagement patterns
         elif engagement_rate > 0.5:
-            if 'business_hours' in temporal_signature:
+            if mental_state == 'positive' and social_connectivity in ['medium', 'high']:
+                if 'business_hours' in temporal_signature:
+                    return 'healthy_business_active'
+                else:
+                    return 'socially_healthy_active'
+            elif social_connectivity == 'isolated':
+                return 'active_but_isolated'
+            elif activity_rhythm == 'bursty' and emotional_stability < 0.4:
+                return 'emotionally_driven_active'
+            elif 'business_hours' in temporal_signature:
                 return 'business_active'
-            elif activity_rhythm == 'bursty' and spending_capacity == 'high':
-                return 'affluent_spontaneous'
-            elif activity_rhythm == 'bursty':
-                return 'spontaneous_active'
             else:
                 return 'active'
+        
+        # Social engagement patterns
         elif communication_style == 'enthusiastic':
-            if spending_capacity in ['high', 'medium']:
+            if mental_state == 'positive' and social_connectivity == 'high':
+                return 'socially_thriving'
+            elif emotional_stability > 0.6:
+                return 'stable_social'
+            elif spending_capacity in ['high', 'medium']:
                 return 'affluent_social'
             else:
                 return 'social'
+        
+        # Informative patterns
         elif communication_style == 'factual':
-            if professional_level in ['senior', 'executive']:
+            if mental_state == 'positive' and professional_level in ['senior', 'executive']:
+                return 'authoritative_informative'
+            elif emotional_stability > 0.7:
+                return 'stable_informative'
+            elif professional_level in ['senior', 'executive']:
                 return 'executive_informative'
-            elif 'consistent' in temporal_signature:
-                return 'professional_informative'
             else:
                 return 'informative'
+        
+        # Scheduled/consistent patterns
         elif consistency_score > 0.6:
-            if professional_level in ['senior', 'executive']:
+            if mental_state == 'positive' and emotional_stability > 0.6:
+                return 'disciplined_communicator'
+            elif professional_level in ['senior', 'executive']:
                 return 'executive_scheduled'
             else:
                 return 'scheduled_poster'
+        
+        # Default patterns with mental health context
+        elif mental_state == 'positive' and emotional_stability > 0.6:
+            if spending_capacity == 'high':
+                return 'balanced_affluent_casual'
+            else:
+                return 'balanced_casual'
+        elif social_connectivity == 'isolated':
+            return 'casual_isolated'
         elif spending_capacity == 'high':
             return 'affluent_casual'
         else:
@@ -1259,11 +1419,23 @@ class AIInferenceEngine:
                 'privacy_economic_implications': [],
                 'analysis_completed': False
             },
+            'mental_state_assessment': {
+                'language_patterns': {},
+                'emoji_patterns': {},
+                'social_interaction': {},
+                'content_tone': {},
+                'risk_factors': {},
+                'mental_state_profile': {},
+                'assessment_confidence': 0.0,
+                'recommendations': [],
+                'privacy_considerations': [],
+                'analysis_completed': False
+            },
             'interest_profile': asdict(InterestProfile([], {}, {}, {}, {}, 'minimal')),
             'analysis_metadata': {
                 'content_analyzed': 0,
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '3.0',
+                'analysis_version': '4.0',
                 'note': 'Insufficient content for comprehensive analysis',
                 'features': [
                     'sentiment_analysis',
@@ -1273,13 +1445,20 @@ class AIInferenceEngine:
                     'topic_modeling',
                     'schedule_patterns',
                     'economic_indicators',
+                    'mental_state_assessment',
                     'interest_profile'
                 ],
                 'economic_brands_detected': 0,
                 'economic_locations_detected': 0,
                 'purchase_activities_detected': 0,
                 'economic_risk_level': 'low',
-                'professional_influence_detected': False
+                'professional_influence_detected': False,
+                'mental_state_detected': 'stable',
+                'mental_health_risk_level': 'low',
+                'emotional_stability_score': 0.5,
+                'social_connectivity_level': 'unknown',
+                'crisis_indicators_detected': False,
+                'protective_factors_identified': 0
             }
         }
 
