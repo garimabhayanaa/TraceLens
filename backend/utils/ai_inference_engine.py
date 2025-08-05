@@ -10,6 +10,7 @@ import time
 from datetime import datetime, timedelta
 import threading
 from .schedule_pattern_detector import create_schedule_pattern_detector
+from .economic_indicators_analyzer import create_economic_indicators_analyzer
 
 # ML and NLP imports
 try:
@@ -669,21 +670,22 @@ class TopicModelingEngine:
             return "General Topics"
 
 class AIInferenceEngine:
-    """Main AI inference engine combining all analysis components including schedule patterns"""
+    """Main AI inference engine combining all analysis components including economic indicators"""
     
     def __init__(self):
         self.sentiment_analyzer = SentimentAnalyzer()
         self.hashtag_analyzer = HashtagAnalyzer()
         self.engagement_analyzer = EngagementAnalyzer()
         self.topic_engine = TopicModelingEngine()
-        self.schedule_detector = create_schedule_pattern_detector()  # NEW: Schedule pattern detector
+        self.schedule_detector = create_schedule_pattern_detector()  # Schedule pattern detector
+        self.economic_analyzer = create_economic_indicators_analyzer()  # NEW: Economic indicators analyzer
         self.analysis_cache = {}
         self.cache_lock = threading.RLock()
     
     def analyze_social_content(self, social_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Comprehensive AI analysis including schedule pattern detection"""
+        """Comprehensive AI analysis including schedule patterns and economic indicators"""
         
-        logger.info("Starting comprehensive AI inference analysis with schedule patterns")
+        logger.info("Starting comprehensive AI inference analysis with schedule patterns and economic indicators")
         
         # Extract content from social data
         content_list = self._extract_content_from_social_data(social_data)
@@ -698,12 +700,13 @@ class AIInferenceEngine:
             'mention_patterns': self._analyze_mention_patterns(content_list),
             'engagement_analysis': self._analyze_engagement(social_data),
             'topic_modeling': self._perform_topic_modeling(content_list),
-            'schedule_patterns': {},  # NEW: Schedule pattern analysis
+            'schedule_patterns': {},  # Schedule pattern analysis
+            'economic_indicators': {},  # NEW: Economic indicators analysis
             'interest_profile': {},
             'analysis_metadata': {
                 'content_analyzed': len(content_list),
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '2.0',  # Updated version with schedule patterns
+                'analysis_version': '3.0',  # Updated version with economic indicators
                 'features': [
                     'sentiment_analysis',
                     'hashtag_patterns', 
@@ -711,6 +714,7 @@ class AIInferenceEngine:
                     'engagement_analysis',
                     'topic_modeling',
                     'schedule_patterns',
+                    'economic_indicators',
                     'interest_profile'
                 ]
             }
@@ -750,10 +754,58 @@ class AIInferenceEngine:
                 'privacy_implications': []
             }
         
-        # Generate comprehensive interest profile (now including schedule insights)
-        analysis_results['interest_profile'] = self._generate_enhanced_interest_profile(analysis_results)
+        # ECONOMIC INDICATORS ANALYSIS
+        try:
+            logger.info("Starting comprehensive economic indicators analysis...")
+            economic_analysis = self.economic_analyzer.analyze_economic_indicators(social_data)
+            
+            analysis_results['economic_indicators'] = {
+                'brand_mentions': [asdict(b) for b in economic_analysis.brand_mentions],
+                'location_patterns': [asdict(l) for l in economic_analysis.location_patterns],
+                'purchase_activities': [asdict(p) for p in economic_analysis.purchase_activities],
+                'professional_network': asdict(economic_analysis.professional_network),
+                'economic_profile': asdict(economic_analysis.economic_profile),
+                'economic_risk_score': economic_analysis.economic_risk_score,
+                'economic_insights': economic_analysis.economic_insights,
+                'privacy_economic_implications': economic_analysis.privacy_economic_implications,
+                'analysis_completed': True
+            }
+            
+            # Update metadata with economic insights
+            analysis_results['analysis_metadata'].update({
+                'economic_brands_detected': len(economic_analysis.brand_mentions),
+                'economic_locations_detected': len(economic_analysis.location_patterns),
+                'purchase_activities_detected': len(economic_analysis.purchase_activities),
+                'economic_risk_level': 'high' if economic_analysis.economic_risk_score > 0.7 else 
+                                      'medium' if economic_analysis.economic_risk_score > 0.4 else 'low',
+                'professional_influence_detected': economic_analysis.professional_network.professional_influence > 0.5
+            })
+            
+            logger.info(f"Economic indicators analysis completed successfully: "
+                       f"Brands: {len(economic_analysis.brand_mentions)}, "
+                       f"Locations: {len(economic_analysis.location_patterns)}, "
+                       f"Purchases: {len(economic_analysis.purchase_activities)}, "
+                       f"Economic Risk: {economic_analysis.economic_risk_score:.2f}")
+            
+        except Exception as e:
+            logger.error(f"Economic indicators analysis failed: {str(e)}")
+            analysis_results['economic_indicators'] = {
+                'error': str(e),
+                'analysis_completed': False,
+                'brand_mentions': [],
+                'location_patterns': [],
+                'purchase_activities': [],
+                'professional_network': {},
+                'economic_profile': {},
+                'economic_risk_score': 0.0,
+                'economic_insights': [],
+                'privacy_economic_implications': []
+            }
         
-        logger.info(f"Enhanced AI inference analysis completed for {len(content_list)} content items")
+        # Generate comprehensive interest profile (now including all insights)
+        analysis_results['interest_profile'] = self._generate_comprehensive_interest_profile(analysis_results)
+        
+        logger.info(f"Comprehensive AI analysis completed for {len(content_list)} content items with full feature set")
         
         return analysis_results
     
@@ -949,8 +1001,8 @@ class AIInferenceEngine:
             'total_topics_identified': len(topics)
         }
     
-    def _generate_enhanced_interest_profile(self, analysis_results: Dict[str, Any]) -> InterestProfile:
-        """Generate enhanced interest profile including schedule patterns"""
+    def _generate_comprehensive_interest_profile(self, analysis_results: Dict[str, Any]) -> InterestProfile:
+        """Generate comprehensive interest profile including all analysis dimensions"""
         
         # Extract primary interests from topic modeling
         primary_interests = []
@@ -969,18 +1021,26 @@ class AIInferenceEngine:
             if hashtag not in interest_scores:
                 interest_scores[hashtag] = pattern['trending_score']
         
-        # Behavioral patterns from sentiment, engagement, and schedule
+        # Add interests from economic indicators
+        economic_data = analysis_results.get('economic_indicators', {})
+        for brand in economic_data.get('brand_mentions', [])[:3]:  # Top 3 brands
+            brand_name = brand.get('brand_name', '')
+            if brand_name and brand_name not in interest_scores:
+                interest_scores[brand_name] = brand.get('sentiment_score', 0.0)
+        
+        # Comprehensive behavioral patterns from all analyses
         sentiment_data = analysis_results.get('sentiment_analysis', {})
         engagement_data = analysis_results.get('engagement_analysis', {})
         schedule_data = analysis_results.get('schedule_patterns', {})
         
-        enhanced_behavioral_patterns = {
+        comprehensive_behavioral_patterns = {
+            # Core behavioral patterns
             'emotional_tendency': sentiment_data.get('overall_sentiment', 'neutral'),
             'communication_style': self._determine_communication_style(sentiment_data, hashtag_data),
             'engagement_preference': engagement_data.get('audience_response_sentiment', 'neutral'),
             'content_frequency': self._estimate_content_frequency(analysis_results),
             
-            # NEW: Schedule-based behavioral patterns
+            # Schedule-based behavioral patterns
             'temporal_signature': schedule_data.get('post_timing', {}).get('temporal_signature', 'unknown'),
             'activity_rhythm': schedule_data.get('activity_frequency', {}).get('engagement_rhythm', 'unknown'),
             'geographic_scope': schedule_data.get('geographic_inference', {}).get('geographic_scope', 'unknown'),
@@ -989,35 +1049,74 @@ class AIInferenceEngine:
             'privacy_awareness': len([i for i in schedule_data.get('privacy_implications', []) if '✅' in i]) > 0,
             'posting_frequency': schedule_data.get('post_timing', {}).get('posting_frequency', 'unknown'),
             'peak_activity_hours': schedule_data.get('post_timing', {}).get('peak_hours', []),
-            'time_zone_indicators': schedule_data.get('post_timing', {}).get('time_zone_indicators', [])
+            'time_zone_indicators': schedule_data.get('post_timing', {}).get('time_zone_indicators', []),
+            
+            # NEW: Economic behavioral patterns
+            'spending_capacity': economic_data.get('economic_profile', {}).get('spending_capacity', 'unknown'),
+            'brand_affinity': economic_data.get('economic_profile', {}).get('brand_affinity_tier', 'unknown'),
+            'purchase_style': economic_data.get('economic_profile', {}).get('purchase_decision_style', 'balanced'),
+            'economic_lifestyle': economic_data.get('economic_profile', {}).get('economic_lifestyle', 'practical'),
+            'professional_level': economic_data.get('professional_network', {}).get('seniority_level', 'unknown'),
+            'economic_risk_awareness': economic_data.get('economic_risk_score', 0.0) < 0.5,
+            'brand_loyalty_tendency': self._calculate_brand_loyalty_tendency(economic_data),
+            'financial_sophistication': economic_data.get('economic_profile', {}).get('financial_sophistication', 'basic'),
+            'professional_influence': economic_data.get('professional_network', {}).get('professional_influence', 0.0)
         }
         
-        # Enhanced content preferences with schedule insights
-        content_preferences = {
+        # Comprehensive content preferences with all insights
+        comprehensive_content_preferences = {
+            # Core content preferences
             'preferred_sentiment': sentiment_data.get('overall_sentiment', 'neutral'),
             'hashtag_usage': hashtag_data.get('usage_style', 'minimal'),
             'interaction_style': analysis_results.get('mention_patterns', {}).get('interaction_style', 'non_interactive'),
             'topic_diversity': topic_data.get('topic_diversity', 0.0),
             
-            # NEW: Schedule-based preferences
+            # Schedule-based preferences
             'preferred_posting_times': schedule_data.get('post_timing', {}).get('peak_hours', []),
             'geographic_preferences': schedule_data.get('geographic_inference', {}).get('likely_locations', []),
-            'work_content_ratio': schedule_data.get('work_personal_boundary', {}).get('professional_content_ratio', 0.0)
+            'work_content_ratio': schedule_data.get('work_personal_boundary', {}).get('professional_content_ratio', 0.0),
+            
+            # NEW: Economic content preferences
+            'brand_mention_frequency': len(economic_data.get('brand_mentions', [])),
+            'location_sharing_tendency': len(economic_data.get('location_patterns', [])),
+            'purchase_sharing_behavior': len(economic_data.get('purchase_activities', [])),
+            'professional_content_ratio': economic_data.get('professional_network', {}).get('thought_leadership_score', 0.0),
+            'luxury_brand_affinity': len([b for b in economic_data.get('brand_mentions', []) if b.get('price_tier') == 'luxury']),
+            'economic_transparency': economic_data.get('economic_risk_score', 0.0),
+            'career_focus_level': economic_data.get('professional_network', {}).get('networking_activity', 'passive')
         }
         
-        # Enhanced engagement style determination
-        engagement_style = self._determine_enhanced_engagement_style(
-            engagement_data, enhanced_behavioral_patterns, schedule_data
+        # Enhanced engagement style determination with economic factors
+        engagement_style = self._determine_comprehensive_engagement_style(
+            engagement_data, comprehensive_behavioral_patterns, schedule_data, economic_data
         )
         
         return InterestProfile(
             primary_interests=primary_interests,
             interest_scores=interest_scores,
             interest_evolution={},  # Would require historical data
-            behavioral_patterns=enhanced_behavioral_patterns,
-            content_preferences=content_preferences,
+            behavioral_patterns=comprehensive_behavioral_patterns,
+            content_preferences=comprehensive_content_preferences,
             engagement_style=engagement_style
         )
+    
+    def _calculate_brand_loyalty_tendency(self, economic_data: Dict[str, Any]) -> str:
+        """Calculate brand loyalty tendency from purchase activities"""
+        
+        purchase_activities = economic_data.get('purchase_activities', [])
+        
+        if not purchase_activities:
+            return 'unknown'
+        
+        loyalty_scores = [activity.get('brand_loyalty_score', 0.0) for activity in purchase_activities]
+        avg_loyalty = np.mean(loyalty_scores) if loyalty_scores else 0.0
+        
+        if avg_loyalty > 0.7:
+            return 'high'
+        elif avg_loyalty > 0.4:
+            return 'medium'
+        else:
+            return 'low'
     
     def _determine_communication_style(self, sentiment_data: Dict, hashtag_data: Dict) -> str:
         """Determine communication style from sentiment and hashtag usage"""
@@ -1051,42 +1150,67 @@ class AIInferenceEngine:
         else:
             return 'minimal'
     
-    def _determine_enhanced_engagement_style(self, engagement_data: Dict, 
-                                           behavioral_patterns: Dict,
-                                           schedule_data: Dict) -> str:
-        """Determine enhanced engagement style including schedule patterns"""
+    def _determine_comprehensive_engagement_style(self, engagement_data: Dict,
+                                                 behavioral_patterns: Dict,
+                                                 schedule_data: Dict,
+                                                 economic_data: Dict) -> str:
+        """Determine comprehensive engagement style including all factors"""
         
         engagement_rate = engagement_data.get('engagement_rate', 0.0)
         viral_potential = engagement_data.get('viral_potential', 0.0)
         communication_style = behavioral_patterns.get('communication_style', 'balanced')
         
-        # NEW: Schedule-based factors
+        # Schedule-based factors
         temporal_signature = behavioral_patterns.get('temporal_signature', 'unknown')
         activity_rhythm = behavioral_patterns.get('activity_rhythm', 'unknown')
         consistency_score = behavioral_patterns.get('schedule_consistency', 0.0)
         
-        # Enhanced engagement style determination
-        if engagement_rate > 0.7 and viral_potential > 0.5:
+        # NEW: Economic factors
+        professional_influence = behavioral_patterns.get('professional_influence', 0.0)
+        spending_capacity = behavioral_patterns.get('spending_capacity', 'unknown')
+        professional_level = behavioral_patterns.get('professional_level', 'unknown')
+        
+        # Comprehensive engagement style determination
+        if professional_influence > 0.7 and professional_level in ['executive', 'senior']:
             if consistency_score > 0.7:
+                return 'thought_leader'
+            else:
+                return 'executive_influencer'
+        elif engagement_rate > 0.7 and viral_potential > 0.5:
+            if spending_capacity == 'high':
+                return 'luxury_influencer'
+            elif consistency_score > 0.7:
                 return 'professional_influencer'
             else:
                 return 'viral_influencer'
         elif engagement_rate > 0.5:
             if 'business_hours' in temporal_signature:
                 return 'business_active'
+            elif activity_rhythm == 'bursty' and spending_capacity == 'high':
+                return 'affluent_spontaneous'
             elif activity_rhythm == 'bursty':
                 return 'spontaneous_active'
             else:
                 return 'active'
         elif communication_style == 'enthusiastic':
-            return 'social'
+            if spending_capacity in ['high', 'medium']:
+                return 'affluent_social'
+            else:
+                return 'social'
         elif communication_style == 'factual':
-            if 'consistent' in temporal_signature:
+            if professional_level in ['senior', 'executive']:
+                return 'executive_informative'
+            elif 'consistent' in temporal_signature:
                 return 'professional_informative'
             else:
                 return 'informative'
         elif consistency_score > 0.6:
-            return 'scheduled_poster'
+            if professional_level in ['senior', 'executive']:
+                return 'executive_scheduled'
+            else:
+                return 'scheduled_poster'
+        elif spending_capacity == 'high':
+            return 'affluent_casual'
         else:
             return 'casual'
     
@@ -1124,21 +1248,38 @@ class AIInferenceEngine:
                 'privacy_implications': [],
                 'analysis_completed': False
             },
+            'economic_indicators': {
+                'brand_mentions': [],
+                'location_patterns': [],
+                'purchase_activities': [],
+                'professional_network': {},
+                'economic_profile': {},
+                'economic_risk_score': 0.0,
+                'economic_insights': [],
+                'privacy_economic_implications': [],
+                'analysis_completed': False
+            },
             'interest_profile': asdict(InterestProfile([], {}, {}, {}, {}, 'minimal')),
             'analysis_metadata': {
                 'content_analyzed': 0,
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '2.0',
+                'analysis_version': '3.0',
                 'note': 'Insufficient content for comprehensive analysis',
                 'features': [
                     'sentiment_analysis',
-                    'hashtag_patterns', 
+                    'hashtag_patterns',
                     'mention_patterns',
                     'engagement_analysis',
                     'topic_modeling',
                     'schedule_patterns',
+                    'economic_indicators',
                     'interest_profile'
-                ]
+                ],
+                'economic_brands_detected': 0,
+                'economic_locations_detected': 0,
+                'purchase_activities_detected': 0,
+                'economic_risk_level': 'low',
+                'professional_influence_detected': False
             }
         }
 
