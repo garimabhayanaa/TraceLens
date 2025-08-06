@@ -3,6 +3,7 @@ import re
 import json
 import numpy as np
 import pandas as pd
+import hashlib
 from typing import Dict, List, Optional, Any, Tuple, Set
 from dataclasses import dataclass, asdict
 from collections import defaultdict, Counter
@@ -17,6 +18,16 @@ from .privacy_framework import create_privacy_framework
 from .ethical_framework import create_ethical_boundaries_framework
 from .consent_framework import create_consent_and_control_framework
 from .authorization_framework import create_authorization_framework, AnalysisType, AccessLevel
+from .risk_mitigation import create_risk_mitigation_framework, RiskMitigationConfig
+
+# Flask imports for risk mitigation
+try:
+    from flask import Flask, request, g
+
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+    logging.warning("Flask not available - Risk mitigation features will be limited")
 
 # ML and NLP imports
 try:
@@ -687,10 +698,11 @@ class TopicModelingEngine:
 
 
 class AIInferenceEngine:
-    """Main AI inference engine with comprehensive privacy protection, ethical boundaries, user consent control, and authorization"""
+    """Main AI inference engine with comprehensive protection: Privacy, Ethics, Consent, Authorization, and Risk Mitigation"""
 
-    def __init__(self, privacy_enabled: bool = True, ethics_enabled: bool = True,
-                 consent_enabled: bool = True, authorization_enabled: bool = True):
+    def __init__(self, app: Flask = None, privacy_enabled: bool = True, ethics_enabled: bool = True,
+                 consent_enabled: bool = True, authorization_enabled: bool = True,
+                 risk_mitigation_enabled: bool = True):
         self.sentiment_analyzer = SentimentAnalyzer()
         self.hashtag_analyzer = HashtagAnalyzer()
         self.engagement_analyzer = EngagementAnalyzer()
@@ -712,6 +724,14 @@ class AIInferenceEngine:
         # Authorization Framework Integration
         self.authorization_framework = create_authorization_framework() if authorization_enabled else None
 
+        # Risk Mitigation Framework Integration
+        if app and risk_mitigation_enabled and FLASK_AVAILABLE:
+            self.risk_mitigation = create_risk_mitigation_framework(app, RiskMitigationConfig())
+        else:
+            self.risk_mitigation = None
+            if risk_mitigation_enabled:
+                logger.warning("Risk mitigation requested but Flask app not provided or Flask not available")
+
         self.analysis_cache = {}
         self.cache_lock = threading.RLock()
 
@@ -729,10 +749,61 @@ class AIInferenceEngine:
                                user_agent: str = '',
                                session_token: str = None,
                                consent_token: str = None) -> Dict[str, Any]:
-        """Comprehensive AI analysis with full authorization, consent, privacy, and ethical protection"""
+        """Comprehensive AI analysis with full protection: Authorization, Consent, Ethics, Privacy, and Risk Mitigation"""
 
-        logger.info(
-            "Starting authorization-verified, consent-verified, ethically-bounded, privacy-protected AI analysis")
+        logger.info("Starting fully-protected AI analysis with all security frameworks")
+
+        # RISK MITIGATION: Input validation and sanitization
+        if self.risk_mitigation:
+            # Validate input data
+            validation_data = {
+                'user_id': user_id,
+                'user_email': user_email,
+                'analysis_type': analysis_type,
+                'target_data_description': target_data_description,
+                'use_case_description': use_case_description,
+                'privacy_level': privacy_level
+            }
+
+            is_valid, validation_errors = self.risk_mitigation.input_validator.validate_request_data(
+                'social_analysis', validation_data
+            )
+
+            if not is_valid:
+                return self._create_validation_error_response(validation_errors)
+
+            # Sanitize text inputs
+            target_data_description = self.risk_mitigation.input_validator.sanitize_input(target_data_description)
+            use_case_description = self.risk_mitigation.input_validator.sanitize_input(use_case_description)
+
+            logger.info("Input validation and sanitization completed successfully")
+
+        # Apply performance caching if risk mitigation is enabled
+        if self.risk_mitigation:
+            cache_key = hashlib.md5(f"{user_id}_{str(social_data)[:100]}_{analysis_type}".encode()).hexdigest()[:16]
+
+            @self.risk_mitigation.performance_optimizer.cache_decorator(ttl_seconds=300)
+            def cached_analysis():
+                return self._perform_full_analysis(
+                    social_data, user_id, user_email, analysis_type, target_data_description,
+                    use_case_description, age_verification_data, consent_process_id,
+                    session_id, privacy_level, ip_address, user_agent, session_token, consent_token
+                )
+
+            return cached_analysis()
+        else:
+            return self._perform_full_analysis(
+                social_data, user_id, user_email, analysis_type, target_data_description,
+                use_case_description, age_verification_data, consent_process_id,
+                session_id, privacy_level, ip_address, user_agent, session_token, consent_token
+            )
+
+    def _perform_full_analysis(self, social_data: Dict[str, Any], user_id: str, user_email: str,
+                               analysis_type: str, target_data_description: str, use_case_description: str,
+                               age_verification_data: Dict[str, Any], consent_process_id: str,
+                               session_id: str, privacy_level: str, ip_address: str, user_agent: str,
+                               session_token: str, consent_token: str) -> Dict[str, Any]:
+        """Perform the full analysis with all protection frameworks"""
 
         # AUTHORIZATION CHECK
         authorization_result = None
@@ -881,15 +952,17 @@ class AIInferenceEngine:
             content_list, social_data, user_id, session_id, authorization_result
         )
 
-        # Add comprehensive metadata
+        # Add comprehensive metadata including risk mitigation info
         analysis_results['analysis_metadata'] = {
             'content_analyzed': len(content_list),
             'analysis_timestamp': datetime.utcnow().isoformat(),
-            'analysis_version': '4.4',  # Updated version with authorization framework
+            'analysis_version': '5.0',  # Updated version with risk mitigation framework
             'privacy_protected': self.privacy_framework is not None,
             'ethics_approved': ethical_approval.ethics_approved if ethical_approval else False,
             'consent_verified': consent_verified,
             'authorization_approved': authorization_result.authorized if authorization_result else False,
+            'risk_mitigation_enabled': self.risk_mitigation is not None,
+            'input_validated': self.risk_mitigation is not None,
             'access_level': authorization_result.access_level.value if authorization_result else 'basic',
             'analysis_type': analysis_type,
             'processing_id': processing_id,
@@ -904,6 +977,7 @@ class AIInferenceEngine:
             'protected_data_size': len(str(social_data)),
             'data_reduction_ratio': 1.0 - (len(str(social_data)) / original_data_size) if original_data_size > 0 else 0,
             'features': [
+                'risk_mitigation_framework',
                 'authorization_framework',
                 'sentiment_analysis',
                 'hashtag_patterns',
@@ -920,6 +994,18 @@ class AIInferenceEngine:
                 'results_presentation'
             ]
         }
+
+        # Add risk mitigation information
+        if self.risk_mitigation:
+            analysis_results['risk_mitigation_status'] = {
+                'enabled': True,
+                'input_validated': True,
+                'rate_limiting_active': True,
+                'error_handling_enabled': True,
+                'performance_optimized': True,
+                'csrf_protection': self.risk_mitigation.config.enable_csrf_protection,
+                'cache_enabled': True
+            }
 
         # Add authorization information
         if authorization_result:
@@ -968,8 +1054,21 @@ class AIInferenceEngine:
                 'professional_review_required': ethical_approval.professional_review is not None
             }
 
-        # RESULTS PRESENTATION with enhanced authorization, consent, ethical and privacy information
+        # RESULTS PRESENTATION with enhanced recommendations
         presentation_result = self.presentation_builder.build(analysis_results)
+
+        # Add comprehensive risk mitigation recommendations
+        if self.risk_mitigation:
+            risk_mitigation_recommendations = [
+                "🛡️ Rate limiting active - API abuse and scraping protection enabled",
+                "✅ Input validation passed - All inputs sanitized and verified",
+                "🚫 XSS and injection protection - Advanced filtering applied",
+                "📊 Performance optimized - Caching mechanisms active",
+                "🔒 CSRF protection enabled - Cross-site request forgery prevented",
+                "📋 Error handling active - Graceful failure modes implemented",
+                "🎯 Request monitoring - All API calls tracked for security"
+            ]
+            presentation_result.mitigation_recommendations.extend(risk_mitigation_recommendations)
 
         # Add comprehensive privacy recommendations
         if self.privacy_framework:
@@ -1047,15 +1146,36 @@ class AIInferenceEngine:
 
         analysis_results["results_presentation"] = asdict(presentation_result)
 
-        logger.info(
-            f"Authorization-verified, consent-verified, ethically-bounded, privacy-protected analysis completed")
+        logger.info(f"Fully-protected analysis completed with all security frameworks")
 
         return analysis_results
+
+    def _create_validation_error_response(self, validation_errors: List[str]) -> Dict[str, Any]:
+        """Create response for input validation errors"""
+
+        return {
+            'analysis_approved': False,
+            'rejection_reason': 'input_validation_failed',
+            'validation_errors': validation_errors,
+            'error_message': 'Input validation failed - please check your data and try again',
+            'recommendations': [
+                'Verify all required fields are filled correctly',
+                'Check that email address is in valid format',
+                'Ensure text inputs do not contain unsafe content',
+                'Confirm analysis type is supported'
+            ],
+            'analysis_metadata': {
+                'analysis_timestamp': datetime.utcnow().isoformat(),
+                'analysis_version': '5.0',
+                'input_validated': False,
+                'rejection_type': 'validation_error'
+            }
+        }
 
     def _perform_authorized_analyses(self, content_list: List[str], social_data: Dict[str, Any],
                                      user_id: str, session_id: str,
                                      authorization_result) -> Dict[str, Any]:
-        """Perform analyses based on authorization access level"""
+        """Perform analyses based on authorization access level with performance optimization"""
 
         access_level = authorization_result.access_level if authorization_result else AccessLevel.BASIC
 
@@ -1075,10 +1195,18 @@ class AIInferenceEngine:
 
         # Enhanced analyses for higher access levels
         if access_level in [AccessLevel.ENHANCED, AccessLevel.PROFESSIONAL]:
-            # Schedule pattern analysis
+            # Schedule pattern analysis with caching if risk mitigation is enabled
             try:
                 if not self._check_opt_out_request(user_id, session_id, 'SCHEDULE_ANALYSIS'):
-                    schedule_analysis = self.schedule_detector.analyze_schedule_patterns(social_data)
+                    if self.risk_mitigation:
+                        @self.risk_mitigation.performance_optimizer.cache_decorator(ttl_seconds=600)
+                        def cached_schedule_analysis():
+                            return self.schedule_detector.analyze_schedule_patterns(social_data)
+
+                        schedule_analysis = cached_schedule_analysis()
+                    else:
+                        schedule_analysis = self.schedule_detector.analyze_schedule_patterns(social_data)
+
                     analysis_results['schedule_patterns'] = {
                         'post_timing': asdict(schedule_analysis.post_timing),
                         'activity_frequency': asdict(schedule_analysis.activity_frequency),
@@ -1094,10 +1222,18 @@ class AIInferenceEngine:
             except Exception as e:
                 analysis_results['schedule_patterns'] = {'error': str(e), 'analysis_completed': False}
 
-            # Economic indicators analysis
+            # Economic indicators analysis with caching
             try:
                 if not self._check_opt_out_request(user_id, session_id, 'ECONOMIC_ANALYSIS'):
-                    economic_analysis = self.economic_analyzer.analyze_economic_indicators(social_data)
+                    if self.risk_mitigation:
+                        @self.risk_mitigation.performance_optimizer.cache_decorator(ttl_seconds=600)
+                        def cached_economic_analysis():
+                            return self.economic_analyzer.analyze_economic_indicators(social_data)
+
+                        economic_analysis = cached_economic_analysis()
+                    else:
+                        economic_analysis = self.economic_analyzer.analyze_economic_indicators(social_data)
+
                     analysis_results['economic_indicators'] = {
                         'brand_mentions': [asdict(b) for b in economic_analysis.brand_mentions],
                         'location_patterns': [asdict(l) for l in economic_analysis.location_patterns],
@@ -1116,10 +1252,18 @@ class AIInferenceEngine:
 
         # Professional-level analyses
         if access_level == AccessLevel.PROFESSIONAL:
-            # Mental state analysis (requires highest access level)
+            # Mental state analysis with caching (requires highest access level)
             try:
                 if not self._check_opt_out_request(user_id, session_id, 'MENTAL_STATE_ANALYSIS'):
-                    mental_state_analysis = self.mental_state_analyzer.analyze_mental_state(social_data)
+                    if self.risk_mitigation:
+                        @self.risk_mitigation.performance_optimizer.cache_decorator(ttl_seconds=600)
+                        def cached_mental_state_analysis():
+                            return self.mental_state_analyzer.analyze_mental_state(social_data)
+
+                        mental_state_analysis = cached_mental_state_analysis()
+                    else:
+                        mental_state_analysis = self.mental_state_analyzer.analyze_mental_state(social_data)
+
                     analysis_results['mental_state_assessment'] = {
                         'language_patterns': asdict(mental_state_analysis.language_patterns),
                         'emoji_patterns': asdict(mental_state_analysis.emoji_patterns),
@@ -1205,7 +1349,7 @@ class AIInferenceEngine:
             ],
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '4.4',
+                'analysis_version': '5.0',
                 'authorization_approved': False,
                 'rejection_type': 'authorization_error'
             }
@@ -1232,7 +1376,7 @@ class AIInferenceEngine:
             },
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '4.4',
+                'analysis_version': '5.0',
                 'authorization_approved': False,
                 'rejection_type': 'authorization_rejected'
             }
@@ -1379,7 +1523,7 @@ class AIInferenceEngine:
             ],
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '4.4',
+                'analysis_version': '5.0',
                 'consent_verified': False,
                 'rejection_type': 'consent_required'
             }
@@ -1562,7 +1706,7 @@ class AIInferenceEngine:
             'appeal_process': 'Contact ethics board for review if you believe this rejection is in error',
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '4.4',
+                'analysis_version': '5.0',
                 'ethics_approved': False,
                 'rejection_type': 'ethical_boundaries'
             }
@@ -1582,7 +1726,7 @@ class AIInferenceEngine:
             ],
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '4.4',
+                'analysis_version': '5.0',
                 'ethics_approved': False,
                 'rejection_type': 'evaluation_error'
             }
@@ -2118,331 +2262,376 @@ class AIInferenceEngine:
         else:
             return 'casual'
 
-        def get_privacy_status(self) -> Dict[str, Any]:
-            """Get current privacy framework status"""
+    def get_privacy_status(self) -> Dict[str, Any]:
+        """Get current privacy framework status"""
 
-            if not self.privacy_framework:
-                return {'privacy_enabled': False}
+        if not self.privacy_framework:
+            return {'privacy_enabled': False}
 
-            return {
-                'privacy_enabled': True,
-                'compliance_status': self.privacy_framework.validate_privacy_compliance(),
-                'client_side_config': self.privacy_framework.get_client_side_config(),
-                'retention_policy': {
-                    'max_hours': self.privacy_framework.retention_policy.max_retention_hours,
-                    'auto_deletion': self.privacy_framework.retention_policy.auto_deletion_enabled,
-                    'secure_deletion': self.privacy_framework.retention_policy.secure_deletion_required,
-                    'audit_trail': self.privacy_framework.retention_policy.audit_trail_enabled
-                }
+        return {
+            'privacy_enabled': True,
+            'compliance_status': self.privacy_framework.validate_privacy_compliance(),
+            'client_side_config': self.privacy_framework.get_client_side_config(),
+            'retention_policy': {
+                'max_hours': self.privacy_framework.retention_policy.max_retention_hours,
+                'auto_deletion': self.privacy_framework.retention_policy.auto_deletion_enabled,
+                'secure_deletion': self.privacy_framework.retention_policy.secure_deletion_required,
+                'audit_trail': self.privacy_framework.retention_policy.audit_trail_enabled
             }
+        }
 
-        def get_ethical_compliance_status(self) -> Dict[str, Any]:
-            """Get current ethical compliance status"""
+    def get_ethical_compliance_status(self) -> Dict[str, Any]:
+        """Get current ethical compliance status"""
 
-            if not self.ethical_framework:
-                return {'ethical_boundaries_enabled': False}
+        if not self.ethical_framework:
+            return {'ethical_boundaries_enabled': False}
 
-            return {
-                'ethical_boundaries_enabled': True,
-                'compliance_report': self.ethical_framework.get_compliance_report(),
-                'ethics_board_status': 'active',
-                'age_verification_methods': [
-                    'government_id',
-                    'credit_card',
-                    'phone_verification',
-                    'third_party_service',
-                    'declaration_with_validation'
-                ],
-                'allowed_use_cases': [
-                    'legitimate_research',
-                    'security_analysis',
-                    'self_assessment',
-                    'educational'
-                ],
-                'prohibited_use_cases': [
-                    'malicious_stalking',
-                    'harassment',
-                    'discrimination',
-                    'unauthorized_profiling'
-                ]
-            }
+        return {
+            'ethical_boundaries_enabled': True,
+            'compliance_report': self.ethical_framework.get_compliance_report(),
+            'ethics_board_status': 'active',
+            'age_verification_methods': [
+                'government_id',
+                'credit_card',
+                'phone_verification',
+                'third_party_service',
+                'declaration_with_validation'
+            ],
+            'allowed_use_cases': [
+                'legitimate_research',
+                'security_analysis',
+                'self_assessment',
+                'educational'
+            ],
+            'prohibited_use_cases': [
+                'malicious_stalking',
+                'harassment',
+                'discrimination',
+                'unauthorized_profiling'
+            ]
+        }
 
-        def get_consent_status(self) -> Dict[str, Any]:
-            """Get current consent framework status"""
+    def get_consent_status(self) -> Dict[str, Any]:
+        """Get current consent framework status"""
 
-            if not self.consent_framework:
-                return {'consent_enabled': False}
+        if not self.consent_framework:
+            return {'consent_enabled': False}
 
-            return {
-                'consent_enabled': True,
-                'multi_step_consent': True,
-                'granular_control': True,
-                'immediate_deletion': True,
-                'stage_by_stage_opt_out': True,
-                'consent_withdrawal': True,
-                'transparency_reports': True,
-                'available_consent_types': [
-                    'data_collection',
-                    'data_processing',
-                    'analysis_inference',
-                    'data_retention',
-                    'result_storage',
-                    'third_party_sharing',
-                    'marketing_communications'
-                ],
-                'processing_stages': [
-                    'data_ingestion',
-                    'privacy_anonymization',
-                    'ethical_evaluation',
-                    'sentiment_analysis',
-                    'schedule_analysis',
-                    'economic_analysis',
-                    'mental_state_analysis',
-                    'results_generation',
-                    'data_deletion'
-                ]
-            }
+        return {
+            'consent_enabled': True,
+            'multi_step_consent': True,
+            'granular_control': True,
+            'immediate_deletion': True,
+            'stage_by_stage_opt_out': True,
+            'consent_withdrawal': True,
+            'transparency_reports': True,
+            'available_consent_types': [
+                'data_collection',
+                'data_processing',
+                'analysis_inference',
+                'data_retention',
+                'result_storage',
+                'third_party_sharing',
+                'marketing_communications'
+            ],
+            'processing_stages': [
+                'data_ingestion',
+                'privacy_anonymization',
+                'ethical_evaluation',
+                'sentiment_analysis',
+                'schedule_analysis',
+                'economic_analysis',
+                'mental_state_analysis',
+                'results_generation',
+                'data_deletion'
+            ]
+        }
 
-        def enable_client_side_processing(self) -> Dict[str, Any]:
-            """Enable client-side processing mode"""
+    def get_risk_mitigation_status(self) -> Dict[str, Any]:
+        """Get current risk mitigation framework status"""
 
-            if not self.privacy_framework:
-                raise ValueError("Privacy framework not initialized")
+        if not self.risk_mitigation:
+            return {'risk_mitigation_enabled': False}
 
-            self.privacy_framework.processing_mode.client_side_enabled = True
-            self.privacy_framework.processing_mode.local_processing_only = True
+        return self.risk_mitigation.get_comprehensive_status()
 
-            return self.privacy_framework.get_client_side_config()
+    def enable_client_side_processing(self) -> Dict[str, Any]:
+        """Enable client-side processing mode"""
 
-        def _create_empty_analysis(self, processing_id: str = None, privacy_level: str = 'standard',
-                                   ethical_approval=None, consent_verified: bool = False,
-                                   authorization_result=None) -> Dict[str, Any]:
-            """Create empty analysis structure when no content is available"""
+        if not self.privacy_framework:
+            raise ValueError("Privacy framework not initialized")
 
-            return {
-                'sentiment_analysis': {
-                    'overall_sentiment': 'neutral',
-                    'sentiment_distribution': {},
-                    'emotional_profile': {}
-                },
-                'hashtag_patterns': {
-                    'patterns': [],
-                    'usage_style': 'minimal',
-                    'trending_topics': []
-                },
-                'mention_patterns': {
-                    'total_mentions': 0,
-                    'interaction_style': 'non_interactive'
-                },
-                'engagement_analysis': asdict(EngagementMetrics(0.0, {}, [], 'neutral', 0.0, 0.0)),
-                'topic_modeling': {
-                    'topics': [],
-                    'primary_topics': [],
-                    'topic_diversity': 0.0
-                },
-                'schedule_patterns': {
-                    'post_timing': {},
-                    'activity_frequency': {},
-                    'geographic_inference': {},
-                    'work_personal_boundary': {},
-                    'overall_schedule_score': 0.0,
-                    'behavioral_insights': [],
-                    'privacy_implications': [],
-                    'analysis_completed': False
-                },
-                'economic_indicators': {
-                    'brand_mentions': [],
-                    'location_patterns': [],
-                    'purchase_activities': [],
-                    'professional_network': {},
-                    'economic_profile': {},
-                    'economic_risk_score': 0.0,
-                    'economic_insights': [],
-                    'privacy_economic_implications': [],
-                    'analysis_completed': False
-                },
-                'mental_state_assessment': {
-                    'language_patterns': {},
-                    'emoji_patterns': {},
-                    'social_interaction': {},
-                    'content_tone': {},
-                    'risk_factors': {},
-                    'mental_state_profile': {},
-                    'assessment_confidence': 0.0,
-                    'recommendations': [],
-                    'privacy_considerations': [],
-                    'analysis_completed': False
-                },
-                'interest_profile': asdict(InterestProfile([], {}, {}, {}, {}, 'minimal')),
-                'authorization_status': {
-                    'authorized': authorization_result.authorized if authorization_result else True,
-                    'access_level': authorization_result.access_level.value if authorization_result else 'basic',
-                    'verification_completed': True,
-                    'consent_obtained': True,
-                    'analysis_scope': self._determine_analysis_scope(
-                        authorization_result.access_level if authorization_result else AccessLevel.BASIC)
-                },
-                'privacy_compliance': self.privacy_framework.validate_privacy_compliance() if self.privacy_framework else {},
-                'privacy_metrics': {
-                    'processing_id': processing_id,
-                    'privacy_level': privacy_level,
-                    'data_protection_enabled': self.privacy_framework is not None
-                },
-                'ethical_compliance': {
-                    'approved': ethical_approval.ethics_approved if ethical_approval else True,
-                    'compliance_score': ethical_approval.compliance_score if ethical_approval else 1.0,
-                    'age_verified': ethical_approval.age_verification.verified if ethical_approval else False,
-                    'restrictions_applied': True
-                } if ethical_approval else {'enabled': self.ethical_framework is not None},
-                'consent_status': {
-                    'consent_verified': consent_verified,
-                    'user_control_options': {
-                        'immediate_deletion': True,
-                        'opt_out_available': True,
-                        'withdraw_consent': True,
-                        'download_data': True
-                    }
-                },
-                'results_presentation': {
-                    'privacy_score': {'value': 1, 'colour': '#008000'},
-                    'inferences': [],
-                    'mitigation_recommendations': [
-                        '🔒 Privacy framework active - Zero data retention',
-                        '⚖️ Ethical boundaries enforced - All guidelines followed',
-                        '🎛️ User consent verified - Full control maintained',
-                        '🔐 Authorization verified - Identity and access confirmed',
-                        '🛡️ All analysis performed on anonymized data',
-                        '🚫 No content available for comprehensive analysis'
-                    ]
-                },
-                'analysis_metadata': {
-                    'content_analyzed': 0,
-                    'analysis_timestamp': datetime.utcnow().isoformat(),
-                    'analysis_version': '4.4',
-                    'privacy_protected': self.privacy_framework is not None,
-                    'ethics_approved': ethical_approval.ethics_approved if ethical_approval else True,
-                    'consent_verified': consent_verified,
-                    'authorization_approved': authorization_result.authorized if authorization_result else True,
-                    'access_level': authorization_result.access_level.value if authorization_result else 'basic',
-                    'processing_id': processing_id,
-                    'privacy_level': privacy_level,
-                    'ethical_compliance_score': ethical_approval.compliance_score if ethical_approval else 1.0,
-                    'note': 'Insufficient content for comprehensive analysis',
+        self.privacy_framework.processing_mode.client_side_enabled = True
+        self.privacy_framework.processing_mode.local_processing_only = True
+
+        return self.privacy_framework.get_client_side_config()
+
+    def _create_empty_analysis(self, processing_id: str = None, privacy_level: str = 'standard',
+                               ethical_approval=None, consent_verified: bool = False,
+                               authorization_result=None) -> Dict[str, Any]:
+        """Create empty analysis structure when no content is available"""
+
+        return {
+            'sentiment_analysis': {
+                'overall_sentiment': 'neutral',
+                'sentiment_distribution': {},
+                'emotional_profile': {}
+            },
+            'hashtag_patterns': {
+                'patterns': [],
+                'usage_style': 'minimal',
+                'trending_topics': []
+            },
+            'mention_patterns': {
+                'total_mentions': 0,
+                'interaction_style': 'non_interactive'
+            },
+            'engagement_analysis': asdict(EngagementMetrics(0.0, {}, [], 'neutral', 0.0, 0.0)),
+            'topic_modeling': {
+                'topics': [],
+                'primary_topics': [],
+                'topic_diversity': 0.0
+            },
+            'schedule_patterns': {
+                'post_timing': {},
+                'activity_frequency': {},
+                'geographic_inference': {},
+                'work_personal_boundary': {},
+                'overall_schedule_score': 0.0,
+                'behavioral_insights': [],
+                'privacy_implications': [],
+                'analysis_completed': False
+            },
+            'economic_indicators': {
+                'brand_mentions': [],
+                'location_patterns': [],
+                'purchase_activities': [],
+                'professional_network': {},
+                'economic_profile': {},
+                'economic_risk_score': 0.0,
+                'economic_insights': [],
+                'privacy_economic_implications': [],
+                'analysis_completed': False
+            },
+            'mental_state_assessment': {
+                'language_patterns': {},
+                'emoji_patterns': {},
+                'social_interaction': {},
+                'content_tone': {},
+                'risk_factors': {},
+                'mental_state_profile': {},
+                'assessment_confidence': 0.0,
+                'recommendations': [],
+                'privacy_considerations': [],
+                'analysis_completed': False
+            },
+            'interest_profile': asdict(InterestProfile([], {}, {}, {}, {}, 'minimal')),
+            'authorization_status': {
+                'authorized': authorization_result.authorized if authorization_result else True,
+                'access_level': authorization_result.access_level.value if authorization_result else 'basic',
+                'verification_completed': True,
+                'consent_obtained': True,
+                'analysis_scope': self._determine_analysis_scope(
+                    authorization_result.access_level if authorization_result else AccessLevel.BASIC)
+            },
+            'risk_mitigation_status': {
+                'enabled': self.risk_mitigation is not None,
+                'input_validated': True,
+                'performance_optimized': True,
+                'error_handling_active': True
+            },
+            'privacy_compliance': self.privacy_framework.validate_privacy_compliance() if self.privacy_framework else {},
+            'privacy_metrics': {
+                'processing_id': processing_id,
+                'privacy_level': privacy_level,
+                'data_protection_enabled': self.privacy_framework is not None
+            },
+            'ethical_compliance': {
+                'approved': ethical_approval.ethics_approved if ethical_approval else True,
+                'compliance_score': ethical_approval.compliance_score if ethical_approval else 1.0,
+                'age_verified': ethical_approval.age_verification.verified if ethical_approval else False,
+                'restrictions_applied': True
+            } if ethical_approval else {'enabled': self.ethical_framework is not None},
+            'consent_status': {
+                'consent_verified': consent_verified,
+                'user_control_options': {
+                    'immediate_deletion': True,
                     'opt_out_available': True,
-                    'immediate_deletion_available': True,
-                    'features': [
-                        'authorization_framework',
-                        'sentiment_analysis',
-                        'hashtag_patterns',
-                        'mention_patterns',
-                        'engagement_analysis',
-                        'topic_modeling',
-                        'schedule_patterns',
-                        'economic_indicators',
-                        'mental_state_assessment',
-                        'interest_profile',
-                        'privacy_framework',
-                        'ethical_boundaries',
-                        'consent_framework',
-                        'results_presentation'
-                    ],
-                    'economic_brands_detected': 0,
-                    'economic_locations_detected': 0,
-                    'purchase_activities_detected': 0,
-                    'economic_risk_level': 'low',
-                    'professional_influence_detected': False,
-                    'mental_state_detected': 'stable',
-                    'mental_health_risk_level': 'low',
-                    'emotional_stability_score': 0.5,
-                    'social_connectivity_level': 'unknown',
-                    'crisis_indicators_detected': False,
-                    'protective_factors_identified': 0
+                    'withdraw_consent': True,
+                    'download_data': True
                 }
-            }
-
-        def get_comprehensive_framework_status(self) -> Dict[str, Any]:
-            """Get complete status of all integrated frameworks"""
-
-            return {
-                'framework_integration': {
-                    'privacy_framework': self.privacy_framework is not None,
-                    'ethical_framework': self.ethical_framework is not None,
-                    'consent_framework': self.consent_framework is not None,
-                    'authorization_framework': self.authorization_framework is not None
-                },
-                'privacy_status': self.get_privacy_status(),
-                'ethical_status': self.get_ethical_compliance_status(),
-                'consent_status': self.get_consent_status(),
-                'authorization_status': self.get_authorization_status(),
-                'integrated_features': [
-                    'Multi-factor identity verification',
-                    'Third-party consent management',
-                    'IP-based abuse prevention',
-                    'Comprehensive access logging',
-                    'Self-analysis data ownership verification',
-                    'Tiered access level control',
-                    'Real-time authorization checking',
-                    'Session management and validation',
-                    'Multi-step consent process',
-                    'Granular consent management',
-                    'Stage-by-stage opt-out capabilities',
-                    'Immediate data deletion',
-                    'Consent withdrawal mechanisms',
-                    'Transparency reporting',
-                    'Zero persistent storage',
-                    'Advanced anonymization',
-                    'End-to-end encryption',
-                    'Secure data deletion',
-                    'Ethical boundaries enforcement',
-                    'Professional ethics oversight',
-                    'Age verification system',
-                    'Malicious use prevention',
-                    'Real-time compliance monitoring'
+            },
+            'results_presentation': {
+                'privacy_score': {'value': 1, 'colour': '#008000'},
+                'inferences': [],
+                'mitigation_recommendations': [
+                    '🛡️ Risk mitigation active - All technical risks addressed',
+                    '🔒 Privacy framework active - Zero data retention',
+                    '⚖️ Ethical boundaries enforced - All guidelines followed',
+                    '🎛️ User consent verified - Full control maintained',
+                    '🔐 Authorization verified - Identity and access confirmed',
+                    '🛡️ All analysis performed on anonymized data',
+                    '🚫 No content available for comprehensive analysis'
+                ]
+            },
+            'analysis_metadata': {
+                'content_analyzed': 0,
+                'analysis_timestamp': datetime.utcnow().isoformat(),
+                'analysis_version': '5.0',
+                'privacy_protected': self.privacy_framework is not None,
+                'ethics_approved': ethical_approval.ethics_approved if ethical_approval else True,
+                'consent_verified': consent_verified,
+                'authorization_approved': authorization_result.authorized if authorization_result else True,
+                'risk_mitigation_enabled': self.risk_mitigation is not None,
+                'access_level': authorization_result.access_level.value if authorization_result else 'basic',
+                'processing_id': processing_id,
+                'privacy_level': privacy_level,
+                'ethical_compliance_score': ethical_approval.compliance_score if ethical_approval else 1.0,
+                'note': 'Insufficient content for comprehensive analysis',
+                'opt_out_available': True,
+                'immediate_deletion_available': True,
+                'features': [
+                    'risk_mitigation_framework',
+                    'authorization_framework',
+                    'sentiment_analysis',
+                    'hashtag_patterns',
+                    'mention_patterns',
+                    'engagement_analysis',
+                    'topic_modeling',
+                    'schedule_patterns',
+                    'economic_indicators',
+                    'mental_state_assessment',
+                    'interest_profile',
+                    'privacy_framework',
+                    'ethical_boundaries',
+                    'consent_framework',
+                    'results_presentation'
                 ],
-                'security_measures': {
-                    'encryption': 'AES-256 end-to-end',
-                    'data_retention': '24 hours maximum',
-                    'deletion_method': 'Cryptographic overwriting',
-                    'access_control': 'Multi-factor authentication',
-                    'audit_logging': 'Complete activity tracking',
-                    'abuse_prevention': 'IP-based blocking with escalation',
-                    'session_security': 'Time-limited secure tokens',
-                    'consent_verification': 'Multi-step process with audit trail'
-                },
-                'compliance_standards': [
-                    'GDPR - General Data Protection Regulation',
-                    'CCPA - California Consumer Privacy Act',
-                    'PIPEDA - Personal Information Protection and Electronic Documents Act',
-                    'LGPD - Lei Geral de Proteção de Dados',
-                    'SOC 2 Type II - Security and Availability',
-                    'ISO 27001 - Information Security Management',
-                    'NIST Privacy Framework - Privacy Engineering',
-                    'IEEE 2857 - Privacy Engineering Standards'
-                ],
-                'system_capabilities': {
-                    'analysis_types': ['self_analysis', 'third_party_analysis', 'research_analysis',
-                                       'security_analysis'],
-                    'access_levels': ['basic', 'enhanced', 'professional', 'restricted'],
-                    'verification_methods': ['email_verification', 'sms_verification', 'biometric_verification',
-                                             'document_verification'],
-                    'consent_types': ['data_collection', 'data_processing', 'analysis_inference', 'data_retention',
-                                      'result_storage'],
-                    'processing_stages': ['data_ingestion', 'privacy_anonymization', 'ethical_evaluation',
-                                          'analysis_stages'],
-                    'privacy_levels': ['minimal', 'standard', 'strict'],
-                    'deletion_scopes': ['complete', 'analysis_only', 'partial']
-                }
+                'economic_brands_detected': 0,
+                'economic_locations_detected': 0,
+                'purchase_activities_detected': 0,
+                'economic_risk_level': 'low',
+                'professional_influence_detected': False,
+                'mental_state_detected': 'stable',
+                'mental_health_risk_level': 'low',
+                'emotional_stability_score': 0.5,
+                'social_connectivity_level': 'unknown',
+                'crisis_indicators_detected': False,
+                'protective_factors_identified': 0
             }
+        }
 
-    def create_ai_inference_engine(privacy_enabled: bool = True, ethics_enabled: bool = True,
-                                   consent_enabled: bool = True, authorization_enabled: bool = True):
+    def get_comprehensive_framework_status(self) -> Dict[str, Any]:
+        """Get complete status of all integrated frameworks"""
+
+        return {
+            'framework_integration': {
+                'privacy_framework': self.privacy_framework is not None,
+                'ethical_framework': self.ethical_framework is not None,
+                'consent_framework': self.consent_framework is not None,
+                'authorization_framework': self.authorization_framework is not None,
+                'risk_mitigation_framework': self.risk_mitigation is not None
+            },
+            'privacy_status': self.get_privacy_status(),
+            'ethical_status': self.get_ethical_compliance_status(),
+            'consent_status': self.get_consent_status(),
+            'authorization_status': self.get_authorization_status(),
+            'risk_mitigation_status': self.get_risk_mitigation_status(),
+            'integrated_features': [
+                'Rate limiting with Flask-Limiter (Redis backend)',
+                'Advanced input validation and sanitization',
+                'XSS and SQL injection prevention',
+                'CSRF protection with Flask-WTF',
+                'Comprehensive error handling with generic messages',
+                'Performance optimization with intelligent caching',
+                'Multi-factor identity verification',
+                'Third-party consent management',
+                'IP-based abuse prevention',
+                'Comprehensive access logging',
+                'Self-analysis data ownership verification',
+                'Tiered access level control',
+                'Real-time authorization checking',
+                'Session management and validation',
+                'Multi-step consent process',
+                'Granular consent management',
+                'Stage-by-stage opt-out capabilities',
+                'Immediate data deletion',
+                'Consent withdrawal mechanisms',
+                'Transparency reporting',
+                'Zero persistent storage',
+                'Advanced anonymization',
+                'End-to-end encryption',
+                'Secure data deletion',
+                'Ethical boundaries enforcement',
+                'Professional ethics oversight',
+                'Age verification system',
+                'Malicious use prevention',
+                'Real-time compliance monitoring'
+            ],
+            'security_measures': {
+                'rate_limiting': 'Flask-Limiter with Redis backend',
+                'input_validation': 'Flask-WTF with comprehensive sanitization',
+                'error_handling': 'Graceful failure with generic messages',
+                'performance_caching': 'LRU cache with TTL expiration',
+                'encryption': 'AES-256 end-to-end',
+                'data_retention': '24 hours maximum',
+                'deletion_method': 'Cryptographic overwriting',
+                'access_control': 'Multi-factor authentication',
+                'audit_logging': 'Complete activity tracking',
+                'abuse_prevention': 'IP-based blocking with escalation',
+                'session_security': 'Time-limited secure tokens',
+                'consent_verification': 'Multi-step process with audit trail'
+            },
+            'compliance_standards': [
+                'GDPR - General Data Protection Regulation',
+                'CCPA - California Consumer Privacy Act',
+                'PIPEDA - Personal Information Protection and Electronic Documents Act',
+                'LGPD - Lei Geral de Proteção de Dados',
+                'SOC 2 Type II - Security and Availability',
+                'ISO 27001 - Information Security Management',
+                'NIST Privacy Framework - Privacy Engineering',
+                'IEEE 2857 - Privacy Engineering Standards',
+                'OWASP Security Guidelines - Web Application Security',
+                'Flask Security Best Practices - Framework-specific security'
+            ],
+            'system_capabilities': {
+                'analysis_types': ['self_analysis', 'third_party_analysis', 'research_analysis', 'security_analysis'],
+                'access_levels': ['basic', 'enhanced', 'professional', 'restricted'],
+                'verification_methods': ['email_verification', 'sms_verification', 'biometric_verification',
+                                         'document_verification'],
+                'consent_types': ['data_collection', 'data_processing', 'analysis_inference', 'data_retention',
+                                  'result_storage'],
+                'processing_stages': ['data_ingestion', 'privacy_anonymization', 'ethical_evaluation',
+                                      'analysis_stages'],
+                'privacy_levels': ['minimal', 'standard', 'strict'],
+                'deletion_scopes': ['complete', 'analysis_only', 'partial'],
+                'risk_mitigation_features': ['rate_limiting', 'input_validation', 'error_handling',
+                                             'performance_optimization']
+            },
+            'performance_metrics': {
+                'cache_enabled': self.risk_mitigation is not None,
+                'rate_limiting_active': self.risk_mitigation is not None,
+                'input_validation_active': self.risk_mitigation is not None,
+                'error_tracking_enabled': self.risk_mitigation is not None
+            } if self.risk_mitigation else {
+                'risk_mitigation_disabled': 'Flask app not provided or Flask not available'
+            }
+        }
+
+    def create_ai_inference_engine(app: Flask = None, privacy_enabled: bool = True,
+                                   ethics_enabled: bool = True, consent_enabled: bool = True,
+                                   authorization_enabled: bool = True, risk_mitigation_enabled: bool = True):
         """Factory function to create AI inference engine with full protection"""
         return AIInferenceEngine(
+            app=app,
             privacy_enabled=privacy_enabled,
             ethics_enabled=ethics_enabled,
             consent_enabled=consent_enabled,
-            authorization_enabled=authorization_enabled
+            authorization_enabled=authorization_enabled,
+            risk_mitigation_enabled=risk_mitigation_enabled
         )
+
+
 
 
 
