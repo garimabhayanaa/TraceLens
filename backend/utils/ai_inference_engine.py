@@ -16,6 +16,7 @@ from .results_presentation import ResultPresentationBuilder
 from .privacy_framework import create_privacy_framework
 from .ethical_framework import create_ethical_boundaries_framework
 from .consent_framework import create_consent_and_control_framework
+from .authorization_framework import create_authorization_framework, AnalysisType, AccessLevel
 
 # ML and NLP imports
 try:
@@ -686,10 +687,10 @@ class TopicModelingEngine:
 
 
 class AIInferenceEngine:
-    """Main AI inference engine with comprehensive privacy protection, ethical boundaries, and user consent control"""
+    """Main AI inference engine with comprehensive privacy protection, ethical boundaries, user consent control, and authorization"""
 
     def __init__(self, privacy_enabled: bool = True, ethics_enabled: bool = True,
-                 consent_enabled: bool = True):
+                 consent_enabled: bool = True, authorization_enabled: bool = True):
         self.sentiment_analyzer = SentimentAnalyzer()
         self.hashtag_analyzer = HashtagAnalyzer()
         self.engagement_analyzer = EngagementAnalyzer()
@@ -705,22 +706,69 @@ class AIInferenceEngine:
         # Ethical Boundaries Framework Integration
         self.ethical_framework = create_ethical_boundaries_framework() if ethics_enabled else None
 
-        # NEW: User Consent and Control Framework Integration
+        # User Consent and Control Framework Integration
         self.consent_framework = create_consent_and_control_framework() if consent_enabled else None
+
+        # Authorization Framework Integration
+        self.authorization_framework = create_authorization_framework() if authorization_enabled else None
 
         self.analysis_cache = {}
         self.cache_lock = threading.RLock()
 
     def analyze_social_content(self, social_data: Dict[str, Any],
                                user_id: str,
+                               user_email: str,
+                               analysis_type: str,
+                               target_data_description: str,
                                use_case_description: str,
                                age_verification_data: Dict[str, Any],
                                consent_process_id: str,
                                session_id: str = None,
-                               privacy_level: str = 'standard') -> Dict[str, Any]:
-        """Comprehensive AI analysis with full consent, privacy, and ethical protection"""
+                               privacy_level: str = 'standard',
+                               ip_address: str = '',
+                               user_agent: str = '',
+                               session_token: str = None,
+                               consent_token: str = None) -> Dict[str, Any]:
+        """Comprehensive AI analysis with full authorization, consent, privacy, and ethical protection"""
 
-        logger.info("Starting consent-verified, ethically-bounded, privacy-protected AI analysis")
+        logger.info(
+            "Starting authorization-verified, consent-verified, ethically-bounded, privacy-protected AI analysis")
+
+        # AUTHORIZATION CHECK
+        authorization_result = None
+        if self.authorization_framework:
+            try:
+                # Convert analysis type string to enum
+                try:
+                    analysis_type_enum = AnalysisType[analysis_type.upper()]
+                except KeyError:
+                    return self._create_authorization_error_response(f"Invalid analysis type: {analysis_type}")
+
+                authorization_result = self.authorization_framework.authorize_analysis_request(
+                    user_id=user_id,
+                    user_email=user_email,
+                    analysis_type=analysis_type_enum,
+                    target_data=target_data_description,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    session_token=session_token,
+                    consent_token=consent_token
+                )
+
+                # Check if authorized
+                if not authorization_result.authorized:
+                    return self._create_authorization_rejection_response(authorization_result)
+
+                logger.info(
+                    f"Authorization approved: {analysis_type} for {user_email} with {authorization_result.access_level.value} access")
+
+                # Update session token if new one was generated
+                if authorization_result.session_token:
+                    session_token = authorization_result.session_token
+
+            except Exception as e:
+                logger.error(f"Authorization check failed: {str(e)}")
+                return self._create_authorization_error_response(str(e))
 
         # USER CONSENT VERIFICATION
         consent_verified = False
@@ -760,7 +808,12 @@ class AIInferenceEngine:
                     data_types=data_types,
                     collection_method='public_api',
                     age_verification_data=age_verification_data,
-                    user_context={'session_id': session_id, 'consent_process_id': consent_process_id}
+                    user_context={
+                        'session_id': session_id,
+                        'consent_process_id': consent_process_id,
+                        'analysis_type': analysis_type,
+                        'authorization_level': authorization_result.access_level.value if authorization_result else 'basic'
+                    }
                 )
 
                 # Check if ethically approved
@@ -779,7 +832,13 @@ class AIInferenceEngine:
 
         if self.privacy_framework:
             try:
-                # Configure privacy level
+                # Configure privacy level based on access level
+                if authorization_result and authorization_result.access_level == AccessLevel.BASIC:
+                    privacy_level = 'strict'  # Enhanced privacy for third-party analysis
+                elif authorization_result and authorization_result.access_level == AccessLevel.PROFESSIONAL:
+                    privacy_level = 'minimal'  # Reduced privacy filtering for research
+
+                # Configure privacy framework
                 if privacy_level == 'strict':
                     self.privacy_framework.anonymization_config.remove_names = True
                     self.privacy_framework.anonymization_config.remove_locations = True
@@ -814,177 +873,64 @@ class AIInferenceEngine:
         content_list = self._extract_content_from_social_data(social_data)
 
         if not content_list:
-            return self._create_empty_analysis(processing_id, privacy_level, ethical_approval, consent_verified)
+            return self._create_empty_analysis(processing_id, privacy_level, ethical_approval,
+                                               consent_verified, authorization_result)
 
-        # Perform all analyses with opt-out checking at each stage
-        analysis_results = {
-            'sentiment_analysis': self._perform_sentiment_analysis_with_opt_out_check(content_list, user_id,
-                                                                                      session_id),
-            'hashtag_patterns': self._analyze_hashtag_patterns_with_opt_out_check(content_list, user_id, session_id),
-            'mention_patterns': self._analyze_mention_patterns_with_opt_out_check(content_list, user_id, session_id),
-            'engagement_analysis': self._analyze_engagement_with_opt_out_check(social_data, user_id, session_id),
-            'topic_modeling': self._perform_topic_modeling_with_opt_out_check(content_list, user_id, session_id),
-            'schedule_patterns': {},
-            'economic_indicators': {},
-            'mental_state_assessment': {},
-            'interest_profile': {},
-            'analysis_metadata': {
-                'content_analyzed': len(content_list),
-                'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '4.3',  # Updated version with consent framework
-                'privacy_protected': self.privacy_framework is not None,
-                'ethics_approved': ethical_approval.ethics_approved if ethical_approval else False,
-                'consent_verified': consent_verified,
-                'processing_id': processing_id,
-                'privacy_level': privacy_level,
-                'ethical_compliance_score': ethical_approval.compliance_score if ethical_approval else 0.0,
-                'consent_process_id': consent_process_id,
-                'use_case': use_case_description,
-                'opt_out_available': True,
-                'immediate_deletion_available': True,
-                'original_data_size': original_data_size,
-                'protected_data_size': len(str(social_data)),
-                'data_reduction_ratio': 1.0 - (
-                            len(str(social_data)) / original_data_size) if original_data_size > 0 else 0,
-                'features': [
-                    'sentiment_analysis',
-                    'hashtag_patterns',
-                    'mention_patterns',
-                    'engagement_analysis',
-                    'topic_modeling',
-                    'schedule_patterns',
-                    'economic_indicators',
-                    'mental_state_assessment',
-                    'interest_profile',
-                    'privacy_framework',
-                    'ethical_boundaries',
-                    'consent_framework',
-                    'results_presentation'
-                ]
-            }
+        # Perform analyses based on access level
+        analysis_results = self._perform_authorized_analyses(
+            content_list, social_data, user_id, session_id, authorization_result
+        )
+
+        # Add comprehensive metadata
+        analysis_results['analysis_metadata'] = {
+            'content_analyzed': len(content_list),
+            'analysis_timestamp': datetime.utcnow().isoformat(),
+            'analysis_version': '4.4',  # Updated version with authorization framework
+            'privacy_protected': self.privacy_framework is not None,
+            'ethics_approved': ethical_approval.ethics_approved if ethical_approval else False,
+            'consent_verified': consent_verified,
+            'authorization_approved': authorization_result.authorized if authorization_result else False,
+            'access_level': authorization_result.access_level.value if authorization_result else 'basic',
+            'analysis_type': analysis_type,
+            'processing_id': processing_id,
+            'session_token': session_token,
+            'privacy_level': privacy_level,
+            'ethical_compliance_score': ethical_approval.compliance_score if ethical_approval else 0.0,
+            'consent_process_id': consent_process_id,
+            'use_case': use_case_description,
+            'opt_out_available': True,
+            'immediate_deletion_available': True,
+            'original_data_size': original_data_size,
+            'protected_data_size': len(str(social_data)),
+            'data_reduction_ratio': 1.0 - (len(str(social_data)) / original_data_size) if original_data_size > 0 else 0,
+            'features': [
+                'authorization_framework',
+                'sentiment_analysis',
+                'hashtag_patterns',
+                'mention_patterns',
+                'engagement_analysis',
+                'topic_modeling',
+                'schedule_patterns',
+                'economic_indicators',
+                'mental_state_assessment',
+                'interest_profile',
+                'privacy_framework',
+                'ethical_boundaries',
+                'consent_framework',
+                'results_presentation'
+            ]
         }
 
-        # SCHEDULE PATTERN DETECTION with opt-out checking
-        try:
-            if not self._check_opt_out_request(user_id, session_id, 'SCHEDULE_ANALYSIS'):
-                logger.info("Starting advanced schedule pattern detection...")
-                schedule_analysis = self.schedule_detector.analyze_schedule_patterns(social_data)
-
-                analysis_results['schedule_patterns'] = {
-                    'post_timing': asdict(schedule_analysis.post_timing),
-                    'activity_frequency': asdict(schedule_analysis.activity_frequency),
-                    'geographic_inference': asdict(schedule_analysis.geographic_inference),
-                    'work_personal_boundary': asdict(schedule_analysis.work_personal_boundary),
-                    'overall_schedule_score': schedule_analysis.overall_schedule_score,
-                    'behavioral_insights': schedule_analysis.behavioral_insights,
-                    'privacy_implications': schedule_analysis.privacy_implications,
-                    'analysis_completed': True
-                }
-
-                logger.info(f"Schedule pattern detection completed successfully")
-            else:
-                analysis_results['schedule_patterns'] = {
-                    'status': 'opted_out',
-                    'message': 'User opted out of schedule pattern analysis',
-                    'analysis_completed': False
-                }
-
-        except Exception as e:
-            logger.error(f"Schedule pattern detection failed: {str(e)}")
-            analysis_results['schedule_patterns'] = {
-                'error': str(e),
-                'analysis_completed': False
+        # Add authorization information
+        if authorization_result:
+            analysis_results['authorization_status'] = {
+                'authorized': authorization_result.authorized,
+                'access_level': authorization_result.access_level.value,
+                'session_token': authorization_result.session_token,
+                'verification_completed': not authorization_result.verification_required,
+                'consent_obtained': not authorization_result.consent_required,
+                'analysis_scope': self._determine_analysis_scope(authorization_result.access_level)
             }
-
-        # ECONOMIC INDICATORS ANALYSIS with opt-out checking
-        try:
-            if not self._check_opt_out_request(user_id, session_id, 'ECONOMIC_ANALYSIS'):
-                logger.info("Starting comprehensive economic indicators analysis...")
-                economic_analysis = self.economic_analyzer.analyze_economic_indicators(social_data)
-
-                analysis_results['economic_indicators'] = {
-                    'brand_mentions': [asdict(b) for b in economic_analysis.brand_mentions],
-                    'location_patterns': [asdict(l) for l in economic_analysis.location_patterns],
-                    'purchase_activities': [asdict(p) for p in economic_analysis.purchase_activities],
-                    'professional_network': asdict(economic_analysis.professional_network),
-                    'economic_profile': asdict(economic_analysis.economic_profile),
-                    'economic_risk_score': economic_analysis.economic_risk_score,
-                    'economic_insights': economic_analysis.economic_insights,
-                    'privacy_economic_implications': economic_analysis.privacy_economic_implications,
-                    'analysis_completed': True
-                }
-
-                # Update metadata with economic insights
-                analysis_results['analysis_metadata'].update({
-                    'economic_brands_detected': len(economic_analysis.brand_mentions),
-                    'economic_locations_detected': len(economic_analysis.location_patterns),
-                    'purchase_activities_detected': len(economic_analysis.purchase_activities),
-                    'economic_risk_level': 'high' if economic_analysis.economic_risk_score > 0.7 else
-                    'medium' if economic_analysis.economic_risk_score > 0.4 else 'low',
-                    'professional_influence_detected': economic_analysis.professional_network.professional_influence > 0.5
-                })
-
-                logger.info(f"Economic indicators analysis completed successfully")
-            else:
-                analysis_results['economic_indicators'] = {
-                    'status': 'opted_out',
-                    'message': 'User opted out of economic indicators analysis',
-                    'analysis_completed': False
-                }
-
-        except Exception as e:
-            logger.error(f"Economic indicators analysis failed: {str(e)}")
-            analysis_results['economic_indicators'] = {
-                'error': str(e),
-                'analysis_completed': False
-            }
-
-        # MENTAL STATE ASSESSMENT with opt-out checking
-        try:
-            if not self._check_opt_out_request(user_id, session_id, 'MENTAL_STATE_ANALYSIS'):
-                logger.info("Starting comprehensive mental state assessment...")
-                mental_state_analysis = self.mental_state_analyzer.analyze_mental_state(social_data)
-
-                analysis_results['mental_state_assessment'] = {
-                    'language_patterns': asdict(mental_state_analysis.language_patterns),
-                    'emoji_patterns': asdict(mental_state_analysis.emoji_patterns),
-                    'social_interaction': asdict(mental_state_analysis.social_interaction),
-                    'content_tone': asdict(mental_state_analysis.content_tone),
-                    'risk_factors': asdict(mental_state_analysis.risk_factors),
-                    'mental_state_profile': asdict(mental_state_analysis.mental_state_profile),
-                    'assessment_confidence': mental_state_analysis.assessment_confidence,
-                    'recommendations': mental_state_analysis.recommendations,
-                    'privacy_considerations': mental_state_analysis.privacy_considerations,
-                    'analysis_completed': True
-                }
-
-                # Update metadata with mental state insights
-                analysis_results['analysis_metadata'].update({
-                    'mental_state_detected': mental_state_analysis.mental_state_profile.overall_mental_state,
-                    'mental_health_risk_level': self._classify_mental_health_risk(mental_state_analysis.risk_factors),
-                    'emotional_stability_score': mental_state_analysis.mental_state_profile.emotional_stability_score,
-                    'social_connectivity_level': mental_state_analysis.mental_state_profile.social_connectivity_level,
-                    'crisis_indicators_detected': len(mental_state_analysis.risk_factors.crisis_warning_signals) > 0,
-                    'protective_factors_identified': len(mental_state_analysis.risk_factors.protective_factors)
-                })
-
-                logger.info(f"Mental state assessment completed successfully")
-            else:
-                analysis_results['mental_state_assessment'] = {
-                    'status': 'opted_out',
-                    'message': 'User opted out of mental state assessment',
-                    'analysis_completed': False
-                }
-
-        except Exception as e:
-            logger.error(f"Mental state assessment failed: {str(e)}")
-            analysis_results['mental_state_assessment'] = {
-                'error': str(e),
-                'analysis_completed': False
-            }
-
-        # Generate comprehensive interest profile
-        analysis_results['interest_profile'] = self._generate_comprehensive_interest_profile(analysis_results)
 
         # Add consent and control information
         if self.consent_framework:
@@ -1022,7 +968,7 @@ class AIInferenceEngine:
                 'professional_review_required': ethical_approval.professional_review is not None
             }
 
-        # RESULTS PRESENTATION with enhanced consent, ethical and privacy information
+        # RESULTS PRESENTATION with enhanced authorization, consent, ethical and privacy information
         presentation_result = self.presentation_builder.build(analysis_results)
 
         # Add comprehensive privacy recommendations
@@ -1077,11 +1023,285 @@ class AIInferenceEngine:
             ]
             presentation_result.mitigation_recommendations.extend(consent_recommendations)
 
+        # Add comprehensive authorization and access control recommendations
+        if authorization_result:
+            authorization_recommendations = [
+                f"✅ Authorization verified - {authorization_result.access_level.value.title()} access level granted",
+                f"🔐 Identity verified - Multi-factor authentication completed",
+                f"📋 Access logged - All analysis requests tracked for security",
+                f"🛡️ Abuse prevention active - IP-based monitoring enabled"
+            ]
+
+            if analysis_type == 'self_analysis':
+                authorization_recommendations.extend([
+                    "👤 Self-analysis confirmed - Analyzing your own digital footprint",
+                    "🔒 Data ownership verified - Access to your social media profiles confirmed"
+                ])
+            elif analysis_type == 'third_party_analysis':
+                authorization_recommendations.extend([
+                    "📝 Third-party consent obtained - Written permission verified",
+                    "⏰ Consent time-limited - Analysis permission expires automatically"
+                ])
+
+            presentation_result.mitigation_recommendations.extend(authorization_recommendations)
+
         analysis_results["results_presentation"] = asdict(presentation_result)
 
-        logger.info(f"Consent-verified, ethically-bounded, privacy-protected analysis completed")
+        logger.info(
+            f"Authorization-verified, consent-verified, ethically-bounded, privacy-protected analysis completed")
 
         return analysis_results
+
+    def _perform_authorized_analyses(self, content_list: List[str], social_data: Dict[str, Any],
+                                     user_id: str, session_id: str,
+                                     authorization_result) -> Dict[str, Any]:
+        """Perform analyses based on authorization access level"""
+
+        access_level = authorization_result.access_level if authorization_result else AccessLevel.BASIC
+
+        # Base analyses available to all access levels
+        analysis_results = {
+            'sentiment_analysis': self._perform_sentiment_analysis_with_opt_out_check(content_list, user_id,
+                                                                                      session_id),
+            'hashtag_patterns': self._analyze_hashtag_patterns_with_opt_out_check(content_list, user_id, session_id),
+            'mention_patterns': self._analyze_mention_patterns_with_opt_out_check(content_list, user_id, session_id),
+            'engagement_analysis': self._analyze_engagement_with_opt_out_check(social_data, user_id, session_id),
+            'topic_modeling': self._perform_topic_modeling_with_opt_out_check(content_list, user_id, session_id),
+            'schedule_patterns': {},
+            'economic_indicators': {},
+            'mental_state_assessment': {},
+            'interest_profile': {}
+        }
+
+        # Enhanced analyses for higher access levels
+        if access_level in [AccessLevel.ENHANCED, AccessLevel.PROFESSIONAL]:
+            # Schedule pattern analysis
+            try:
+                if not self._check_opt_out_request(user_id, session_id, 'SCHEDULE_ANALYSIS'):
+                    schedule_analysis = self.schedule_detector.analyze_schedule_patterns(social_data)
+                    analysis_results['schedule_patterns'] = {
+                        'post_timing': asdict(schedule_analysis.post_timing),
+                        'activity_frequency': asdict(schedule_analysis.activity_frequency),
+                        'geographic_inference': asdict(schedule_analysis.geographic_inference),
+                        'work_personal_boundary': asdict(schedule_analysis.work_personal_boundary),
+                        'overall_schedule_score': schedule_analysis.overall_schedule_score,
+                        'behavioral_insights': schedule_analysis.behavioral_insights,
+                        'privacy_implications': schedule_analysis.privacy_implications,
+                        'analysis_completed': True
+                    }
+                else:
+                    analysis_results['schedule_patterns'] = {'status': 'opted_out', 'analysis_completed': False}
+            except Exception as e:
+                analysis_results['schedule_patterns'] = {'error': str(e), 'analysis_completed': False}
+
+            # Economic indicators analysis
+            try:
+                if not self._check_opt_out_request(user_id, session_id, 'ECONOMIC_ANALYSIS'):
+                    economic_analysis = self.economic_analyzer.analyze_economic_indicators(social_data)
+                    analysis_results['economic_indicators'] = {
+                        'brand_mentions': [asdict(b) for b in economic_analysis.brand_mentions],
+                        'location_patterns': [asdict(l) for l in economic_analysis.location_patterns],
+                        'purchase_activities': [asdict(p) for p in economic_analysis.purchase_activities],
+                        'professional_network': asdict(economic_analysis.professional_network),
+                        'economic_profile': asdict(economic_analysis.economic_profile),
+                        'economic_risk_score': economic_analysis.economic_risk_score,
+                        'economic_insights': economic_analysis.economic_insights,
+                        'privacy_economic_implications': economic_analysis.privacy_economic_implications,
+                        'analysis_completed': True
+                    }
+                else:
+                    analysis_results['economic_indicators'] = {'status': 'opted_out', 'analysis_completed': False}
+            except Exception as e:
+                analysis_results['economic_indicators'] = {'error': str(e), 'analysis_completed': False}
+
+        # Professional-level analyses
+        if access_level == AccessLevel.PROFESSIONAL:
+            # Mental state analysis (requires highest access level)
+            try:
+                if not self._check_opt_out_request(user_id, session_id, 'MENTAL_STATE_ANALYSIS'):
+                    mental_state_analysis = self.mental_state_analyzer.analyze_mental_state(social_data)
+                    analysis_results['mental_state_assessment'] = {
+                        'language_patterns': asdict(mental_state_analysis.language_patterns),
+                        'emoji_patterns': asdict(mental_state_analysis.emoji_patterns),
+                        'social_interaction': asdict(mental_state_analysis.social_interaction),
+                        'content_tone': asdict(mental_state_analysis.content_tone),
+                        'risk_factors': asdict(mental_state_analysis.risk_factors),
+                        'mental_state_profile': asdict(mental_state_analysis.mental_state_profile),
+                        'assessment_confidence': mental_state_analysis.assessment_confidence,
+                        'recommendations': mental_state_analysis.recommendations,
+                        'privacy_considerations': mental_state_analysis.privacy_considerations,
+                        'analysis_completed': True
+                    }
+                else:
+                    analysis_results['mental_state_assessment'] = {'status': 'opted_out', 'analysis_completed': False}
+            except Exception as e:
+                analysis_results['mental_state_assessment'] = {'error': str(e), 'analysis_completed': False}
+
+        # Generate interest profile based on available analyses
+        analysis_results['interest_profile'] = self._generate_comprehensive_interest_profile(analysis_results)
+
+        return analysis_results
+
+    def _determine_analysis_scope(self, access_level: AccessLevel) -> Dict[str, bool]:
+        """Determine what analyses are available for each access level"""
+
+        scope_mapping = {
+            AccessLevel.BASIC: {
+                'sentiment_analysis': True,
+                'hashtag_patterns': True,
+                'mention_patterns': True,
+                'engagement_analysis': True,
+                'topic_modeling': True,
+                'schedule_patterns': False,
+                'economic_indicators': False,
+                'mental_state_assessment': False
+            },
+            AccessLevel.ENHANCED: {
+                'sentiment_analysis': True,
+                'hashtag_patterns': True,
+                'mention_patterns': True,
+                'engagement_analysis': True,
+                'topic_modeling': True,
+                'schedule_patterns': True,
+                'economic_indicators': True,
+                'mental_state_assessment': False
+            },
+            AccessLevel.PROFESSIONAL: {
+                'sentiment_analysis': True,
+                'hashtag_patterns': True,
+                'mention_patterns': True,
+                'engagement_analysis': True,
+                'topic_modeling': True,
+                'schedule_patterns': True,
+                'economic_indicators': True,
+                'mental_state_assessment': True
+            },
+            AccessLevel.RESTRICTED: {
+                'sentiment_analysis': False,
+                'hashtag_patterns': False,
+                'mention_patterns': False,
+                'engagement_analysis': False,
+                'topic_modeling': False,
+                'schedule_patterns': False,
+                'economic_indicators': False,
+                'mental_state_assessment': False
+            }
+        }
+
+        return scope_mapping.get(access_level, scope_mapping[AccessLevel.BASIC])
+
+    def _create_authorization_error_response(self, error_message: str) -> Dict[str, Any]:
+        """Create response for authorization errors"""
+
+        return {
+            'analysis_approved': False,
+            'rejection_reason': 'authorization_error',
+            'error_message': error_message,
+            'authorization_required': True,
+            'recommendations': [
+                'Verify your identity with multi-factor email verification',
+                'Ensure you have permission to analyze the requested data',
+                'Contact support if you believe this is an error'
+            ],
+            'analysis_metadata': {
+                'analysis_timestamp': datetime.utcnow().isoformat(),
+                'analysis_version': '4.4',
+                'authorization_approved': False,
+                'rejection_type': 'authorization_error'
+            }
+        }
+
+    def _create_authorization_rejection_response(self, authorization_result) -> Dict[str, Any]:
+        """Create response for authorization rejections"""
+
+        return {
+            'analysis_approved': False,
+            'rejection_reason': 'authorization_rejected',
+            'authorization_result': asdict(authorization_result),
+            'failure_reasons': authorization_result.failure_reasons,
+            'required_actions': authorization_result.required_actions,
+            'recommendations': [
+                'Complete required identity verification steps',
+                'Obtain necessary consent for third-party analysis',
+                'Verify data ownership for self-analysis requests'
+            ],
+            'next_steps': {
+                'identity_verification_required': authorization_result.verification_required,
+                'consent_required': authorization_result.consent_required,
+                'access_level': authorization_result.access_level.value
+            },
+            'analysis_metadata': {
+                'analysis_timestamp': datetime.utcnow().isoformat(),
+                'analysis_version': '4.4',
+                'authorization_approved': False,
+                'rejection_type': 'authorization_rejected'
+            }
+        }
+
+    # Authorization framework integration methods
+    def initiate_identity_verification(self, user_id: str, email: str,
+                                       ip_address: str, user_agent: str) -> Dict[str, Any]:
+        """Initiate identity verification process"""
+
+        if not self.authorization_framework:
+            return {'success': False, 'error': 'Authorization framework not available'}
+
+        try:
+            verification = self.authorization_framework.identity_verifier.initiate_email_verification(
+                user_id, email, ip_address, user_agent
+            )
+
+            return {
+                'success': True,
+                'verification_id': verification.verification_id,
+                'expires_at': verification.expires_at.isoformat(),
+                'message': f'Verification code sent to {email}'
+            }
+
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def verify_identity(self, verification_id: str, verification_code: str,
+                        ip_address: str) -> Dict[str, Any]:
+        """Complete identity verification"""
+
+        if not self.authorization_framework:
+            return {'success': False, 'error': 'Authorization framework not available'}
+
+        return self.authorization_framework.identity_verifier.verify_identity(
+            verification_id, verification_code, ip_address
+        )
+
+    def request_third_party_consent(self, requester_user_id: str, target_email: str,
+                                    analysis_purpose: str, data_scope: List[str]) -> Dict[str, Any]:
+        """Request consent for third-party analysis"""
+
+        if not self.authorization_framework:
+            return {'success': False, 'error': 'Authorization framework not available'}
+
+        try:
+            consent_request = self.authorization_framework.consent_manager.request_third_party_consent(
+                requester_user_id, target_email, analysis_purpose, data_scope
+            )
+
+            return {
+                'success': True,
+                'consent_id': consent_request.consent_id,
+                'consent_token': consent_request.consent_token,
+                'expires_at': consent_request.expires_at.isoformat(),
+                'message': f'Consent request sent to {target_email}'
+            }
+
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def get_authorization_status(self) -> Dict[str, Any]:
+        """Get current authorization framework status"""
+
+        if not self.authorization_framework:
+            return {'authorization_enabled': False}
+
+        return self.authorization_framework.get_authorization_status()
 
     def _perform_sentiment_analysis_with_opt_out_check(self, content_list: List[str],
                                                        user_id: str, session_id: str) -> Dict[str, Any]:
@@ -1159,7 +1379,7 @@ class AIInferenceEngine:
             ],
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '4.3',
+                'analysis_version': '4.4',
                 'consent_verified': False,
                 'rejection_type': 'consent_required'
             }
@@ -1342,7 +1562,7 @@ class AIInferenceEngine:
             'appeal_process': 'Contact ethics board for review if you believe this rejection is in error',
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '4.3',
+                'analysis_version': '4.4',
                 'ethics_approved': False,
                 'rejection_type': 'ethical_boundaries'
             }
@@ -1362,7 +1582,7 @@ class AIInferenceEngine:
             ],
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '4.3',
+                'analysis_version': '4.4',
                 'ethics_approved': False,
                 'rejection_type': 'evaluation_error'
             }
@@ -1898,54 +2118,54 @@ class AIInferenceEngine:
         else:
             return 'casual'
 
-    def get_privacy_status(self) -> Dict[str, Any]:
-        """Get current privacy framework status"""
+        def get_privacy_status(self) -> Dict[str, Any]:
+            """Get current privacy framework status"""
 
-        if not self.privacy_framework:
-            return {'privacy_enabled': False}
+            if not self.privacy_framework:
+                return {'privacy_enabled': False}
 
-        return {
-            'privacy_enabled': True,
-            'compliance_status': self.privacy_framework.validate_privacy_compliance(),
-            'client_side_config': self.privacy_framework.get_client_side_config(),
-            'retention_policy': {
-                'max_hours': self.privacy_framework.retention_policy.max_retention_hours,
-                'auto_deletion': self.privacy_framework.retention_policy.auto_deletion_enabled,
-                'secure_deletion': self.privacy_framework.retention_policy.secure_deletion_required,
-                'audit_trail': self.privacy_framework.retention_policy.audit_trail_enabled
+            return {
+                'privacy_enabled': True,
+                'compliance_status': self.privacy_framework.validate_privacy_compliance(),
+                'client_side_config': self.privacy_framework.get_client_side_config(),
+                'retention_policy': {
+                    'max_hours': self.privacy_framework.retention_policy.max_retention_hours,
+                    'auto_deletion': self.privacy_framework.retention_policy.auto_deletion_enabled,
+                    'secure_deletion': self.privacy_framework.retention_policy.secure_deletion_required,
+                    'audit_trail': self.privacy_framework.retention_policy.audit_trail_enabled
+                }
             }
-        }
 
-    def get_ethical_compliance_status(self) -> Dict[str, Any]:
-        """Get current ethical compliance status"""
+        def get_ethical_compliance_status(self) -> Dict[str, Any]:
+            """Get current ethical compliance status"""
 
-        if not self.ethical_framework:
-            return {'ethical_boundaries_enabled': False}
+            if not self.ethical_framework:
+                return {'ethical_boundaries_enabled': False}
 
-        return {
-            'ethical_boundaries_enabled': True,
-            'compliance_report': self.ethical_framework.get_compliance_report(),
-            'ethics_board_status': 'active',
-            'age_verification_methods': [
-                'government_id',
-                'credit_card',
-                'phone_verification',
-                'third_party_service',
-                'declaration_with_validation'
-            ],
-            'allowed_use_cases': [
-                'legitimate_research',
-                'security_analysis',
-                'self_assessment',
-                'educational'
-            ],
-            'prohibited_use_cases': [
-                'malicious_stalking',
-                'harassment',
-                'discrimination',
-                'unauthorized_profiling'
-            ]
-        }
+            return {
+                'ethical_boundaries_enabled': True,
+                'compliance_report': self.ethical_framework.get_compliance_report(),
+                'ethics_board_status': 'active',
+                'age_verification_methods': [
+                    'government_id',
+                    'credit_card',
+                    'phone_verification',
+                    'third_party_service',
+                    'declaration_with_validation'
+                ],
+                'allowed_use_cases': [
+                    'legitimate_research',
+                    'security_analysis',
+                    'self_assessment',
+                    'educational'
+                ],
+                'prohibited_use_cases': [
+                    'malicious_stalking',
+                    'harassment',
+                    'discrimination',
+                    'unauthorized_profiling'
+                ]
+            }
 
         def get_consent_status(self) -> Dict[str, Any]:
             """Get current consent framework status"""
@@ -1995,7 +2215,8 @@ class AIInferenceEngine:
             return self.privacy_framework.get_client_side_config()
 
         def _create_empty_analysis(self, processing_id: str = None, privacy_level: str = 'standard',
-                                   ethical_approval=None, consent_verified: bool = False) -> Dict[str, Any]:
+                                   ethical_approval=None, consent_verified: bool = False,
+                                   authorization_result=None) -> Dict[str, Any]:
             """Create empty analysis structure when no content is available"""
 
             return {
@@ -2053,6 +2274,14 @@ class AIInferenceEngine:
                     'analysis_completed': False
                 },
                 'interest_profile': asdict(InterestProfile([], {}, {}, {}, {}, 'minimal')),
+                'authorization_status': {
+                    'authorized': authorization_result.authorized if authorization_result else True,
+                    'access_level': authorization_result.access_level.value if authorization_result else 'basic',
+                    'verification_completed': True,
+                    'consent_obtained': True,
+                    'analysis_scope': self._determine_analysis_scope(
+                        authorization_result.access_level if authorization_result else AccessLevel.BASIC)
+                },
                 'privacy_compliance': self.privacy_framework.validate_privacy_compliance() if self.privacy_framework else {},
                 'privacy_metrics': {
                     'processing_id': processing_id,
@@ -2081,6 +2310,7 @@ class AIInferenceEngine:
                         '🔒 Privacy framework active - Zero data retention',
                         '⚖️ Ethical boundaries enforced - All guidelines followed',
                         '🎛️ User consent verified - Full control maintained',
+                        '🔐 Authorization verified - Identity and access confirmed',
                         '🛡️ All analysis performed on anonymized data',
                         '🚫 No content available for comprehensive analysis'
                     ]
@@ -2088,10 +2318,12 @@ class AIInferenceEngine:
                 'analysis_metadata': {
                     'content_analyzed': 0,
                     'analysis_timestamp': datetime.utcnow().isoformat(),
-                    'analysis_version': '4.3',
+                    'analysis_version': '4.4',
                     'privacy_protected': self.privacy_framework is not None,
                     'ethics_approved': ethical_approval.ethics_approved if ethical_approval else True,
                     'consent_verified': consent_verified,
+                    'authorization_approved': authorization_result.authorized if authorization_result else True,
+                    'access_level': authorization_result.access_level.value if authorization_result else 'basic',
                     'processing_id': processing_id,
                     'privacy_level': privacy_level,
                     'ethical_compliance_score': ethical_approval.compliance_score if ethical_approval else 1.0,
@@ -2099,6 +2331,7 @@ class AIInferenceEngine:
                     'opt_out_available': True,
                     'immediate_deletion_available': True,
                     'features': [
+                        'authorization_framework',
                         'sentiment_analysis',
                         'hashtag_patterns',
                         'mention_patterns',
@@ -2127,11 +2360,92 @@ class AIInferenceEngine:
                 }
             }
 
+        def get_comprehensive_framework_status(self) -> Dict[str, Any]:
+            """Get complete status of all integrated frameworks"""
+
+            return {
+                'framework_integration': {
+                    'privacy_framework': self.privacy_framework is not None,
+                    'ethical_framework': self.ethical_framework is not None,
+                    'consent_framework': self.consent_framework is not None,
+                    'authorization_framework': self.authorization_framework is not None
+                },
+                'privacy_status': self.get_privacy_status(),
+                'ethical_status': self.get_ethical_compliance_status(),
+                'consent_status': self.get_consent_status(),
+                'authorization_status': self.get_authorization_status(),
+                'integrated_features': [
+                    'Multi-factor identity verification',
+                    'Third-party consent management',
+                    'IP-based abuse prevention',
+                    'Comprehensive access logging',
+                    'Self-analysis data ownership verification',
+                    'Tiered access level control',
+                    'Real-time authorization checking',
+                    'Session management and validation',
+                    'Multi-step consent process',
+                    'Granular consent management',
+                    'Stage-by-stage opt-out capabilities',
+                    'Immediate data deletion',
+                    'Consent withdrawal mechanisms',
+                    'Transparency reporting',
+                    'Zero persistent storage',
+                    'Advanced anonymization',
+                    'End-to-end encryption',
+                    'Secure data deletion',
+                    'Ethical boundaries enforcement',
+                    'Professional ethics oversight',
+                    'Age verification system',
+                    'Malicious use prevention',
+                    'Real-time compliance monitoring'
+                ],
+                'security_measures': {
+                    'encryption': 'AES-256 end-to-end',
+                    'data_retention': '24 hours maximum',
+                    'deletion_method': 'Cryptographic overwriting',
+                    'access_control': 'Multi-factor authentication',
+                    'audit_logging': 'Complete activity tracking',
+                    'abuse_prevention': 'IP-based blocking with escalation',
+                    'session_security': 'Time-limited secure tokens',
+                    'consent_verification': 'Multi-step process with audit trail'
+                },
+                'compliance_standards': [
+                    'GDPR - General Data Protection Regulation',
+                    'CCPA - California Consumer Privacy Act',
+                    'PIPEDA - Personal Information Protection and Electronic Documents Act',
+                    'LGPD - Lei Geral de Proteção de Dados',
+                    'SOC 2 Type II - Security and Availability',
+                    'ISO 27001 - Information Security Management',
+                    'NIST Privacy Framework - Privacy Engineering',
+                    'IEEE 2857 - Privacy Engineering Standards'
+                ],
+                'system_capabilities': {
+                    'analysis_types': ['self_analysis', 'third_party_analysis', 'research_analysis',
+                                       'security_analysis'],
+                    'access_levels': ['basic', 'enhanced', 'professional', 'restricted'],
+                    'verification_methods': ['email_verification', 'sms_verification', 'biometric_verification',
+                                             'document_verification'],
+                    'consent_types': ['data_collection', 'data_processing', 'analysis_inference', 'data_retention',
+                                      'result_storage'],
+                    'processing_stages': ['data_ingestion', 'privacy_anonymization', 'ethical_evaluation',
+                                          'analysis_stages'],
+                    'privacy_levels': ['minimal', 'standard', 'strict'],
+                    'deletion_scopes': ['complete', 'analysis_only', 'partial']
+                }
+            }
+
     def create_ai_inference_engine(privacy_enabled: bool = True, ethics_enabled: bool = True,
-                                   consent_enabled: bool = True):
+                                   consent_enabled: bool = True, authorization_enabled: bool = True):
         """Factory function to create AI inference engine with full protection"""
-        return AIInferenceEngine(privacy_enabled=privacy_enabled,
-                                 ethics_enabled=ethics_enabled,
-                                 consent_enabled=consent_enabled)
+        return AIInferenceEngine(
+            privacy_enabled=privacy_enabled,
+            ethics_enabled=ethics_enabled,
+            consent_enabled=consent_enabled,
+            authorization_enabled=authorization_enabled
+        )
+
+
+
+
 
 

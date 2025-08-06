@@ -892,8 +892,7 @@ def cleanup_db(error):
         logger.error(f"App context error: {error}")
 
 # Initialize database tables
-@app.before_first_request
-def create_tables():
+with app.app_context():
     try:
         db.create_all()
         logger.info("Database tables created successfully")
