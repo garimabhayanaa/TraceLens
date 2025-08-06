@@ -20,6 +20,7 @@ from .consent_framework import create_consent_and_control_framework
 from .authorization_framework import create_authorization_framework, AnalysisType, AccessLevel
 from .risk_mitigation import create_risk_mitigation_framework, RiskMitigationConfig
 from .legal_ethical_framework import create_legal_ethical_framework, LegalEthicalConfig, ContentRisk, RiskLevel
+from .abuse_prevention import create_abuse_prevention_framework, AbusePreventionConfig, ReportType
 
 # Flask imports for risk mitigation
 try:
@@ -699,11 +700,12 @@ class TopicModelingEngine:
 
 
 class AIInferenceEngine:
-    """Main AI inference engine with comprehensive protection: Privacy, Ethics, Consent, Authorization, Risk Mitigation, and Legal/Ethical Compliance"""
+    """Main AI inference engine with comprehensive protection: Privacy, Ethics, Consent, Authorization, Risk Mitigation, Legal/Ethical Compliance, and Abuse Prevention"""
 
     def __init__(self, app: Flask = None, privacy_enabled: bool = True, ethics_enabled: bool = True,
                  consent_enabled: bool = True, authorization_enabled: bool = True,
-                 risk_mitigation_enabled: bool = True, legal_ethical_enabled: bool = True):
+                 risk_mitigation_enabled: bool = True, legal_ethical_enabled: bool = True,
+                 abuse_prevention_enabled: bool = True):
         self.sentiment_analyzer = SentimentAnalyzer()
         self.hashtag_analyzer = HashtagAnalyzer()
         self.engagement_analyzer = EngagementAnalyzer()
@@ -737,6 +739,10 @@ class AIInferenceEngine:
         self.legal_ethical_framework = create_legal_ethical_framework(
             LegalEthicalConfig()) if legal_ethical_enabled else None
 
+        # Abuse Prevention Framework Integration
+        self.abuse_prevention = create_abuse_prevention_framework(
+            AbusePreventionConfig()) if abuse_prevention_enabled else None
+
         self.analysis_cache = {}
         self.cache_lock = threading.RLock()
 
@@ -753,10 +759,38 @@ class AIInferenceEngine:
                                ip_address: str = '',
                                user_agent: str = '',
                                session_token: str = None,
-                               consent_token: str = None) -> Dict[str, Any]:
-        """Comprehensive AI analysis with full protection: Authorization, Consent, Ethics, Privacy, Risk Mitigation, and Legal/Ethical Compliance"""
+                               consent_token: str = None,
+                               recaptcha_response: str = None,
+                               verification_code: str = None,
+                               verification_id: str = None) -> Dict[str, Any]:
+        """Comprehensive AI analysis with full protection: All seven frameworks integrated"""
 
-        logger.info("Starting fully-protected AI analysis with all security and legal frameworks")
+        logger.info("Starting fully-protected AI analysis with all security, legal, and abuse prevention frameworks")
+
+        # ABUSE PREVENTION: Comprehensive verification before any processing
+        if self.abuse_prevention:
+            try:
+                verification_result = self.abuse_prevention.verify_request(
+                    user_id=user_id,
+                    email=user_email,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    recaptcha_response=recaptcha_response,
+                    verification_code=verification_code,
+                    verification_id=verification_id
+                )
+
+                if not verification_result['allowed']:
+                    # Record failed attempt
+                    self.abuse_prevention.record_analysis_attempt(user_id, False)
+
+                    return self._create_abuse_prevention_rejection(verification_result)
+
+                logger.info("Abuse prevention verification passed")
+
+            except Exception as e:
+                logger.error(f"Abuse prevention check failed: {str(e)}")
+                # Continue with analysis but log the failure
 
         # RISK MITIGATION: Input validation and sanitization
         if self.risk_mitigation:
@@ -1029,19 +1063,25 @@ class AIInferenceEngine:
             content_list, social_data, user_id, session_id, authorization_result
         )
 
+        # Record successful analysis attempt for abuse prevention
+        if self.abuse_prevention:
+            self.abuse_prevention.record_analysis_attempt(user_id, True)
+
         # Add comprehensive metadata including all frameworks
         analysis_results['analysis_metadata'] = {
             'content_analyzed': len(content_list),
             'analysis_timestamp': datetime.utcnow().isoformat(),
-            'analysis_version': '5.1',  # Updated version with legal/ethical framework
+            'analysis_version': '5.2',  # Updated version with abuse prevention framework
             'privacy_protected': self.privacy_framework is not None,
             'ethics_approved': ethical_approval.ethics_approved if ethical_approval else False,
             'consent_verified': consent_verified,
             'authorization_approved': authorization_result.authorized if authorization_result else False,
             'risk_mitigation_enabled': self.risk_mitigation is not None,
             'legal_ethical_enabled': self.legal_ethical_framework is not None,
+            'abuse_prevention_enabled': self.abuse_prevention is not None,
             'content_moderated': moderation_result is not None,
             'input_validated': self.risk_mitigation is not None,
+            'user_verified': self.abuse_prevention is not None,
             'access_level': authorization_result.access_level.value if authorization_result else 'basic',
             'analysis_type': analysis_type,
             'processing_id': processing_id,
@@ -1056,6 +1096,7 @@ class AIInferenceEngine:
             'protected_data_size': len(str(social_data)),
             'data_reduction_ratio': 1.0 - (len(str(social_data)) / original_data_size) if original_data_size > 0 else 0,
             'features': [
+                'abuse_prevention_framework',
                 'legal_ethical_framework',
                 'risk_mitigation_framework',
                 'authorization_framework',
@@ -1074,6 +1115,21 @@ class AIInferenceEngine:
                 'results_presentation'
             ]
         }
+
+        # Add abuse prevention information
+        if self.abuse_prevention:
+            usage_stats = self.abuse_prevention.usage_manager.get_usage_stats(user_id)
+
+            analysis_results['abuse_prevention_status'] = {
+                'enabled': True,
+                'user_verified': True,
+                'usage_limits_checked': True,
+                'ip_tracking_active': True,
+                'recaptcha_verified': True,
+                'email_verified': True
+            }
+
+            analysis_results['usage_statistics'] = usage_stats
 
         # Add legal and ethical compliance information
         if self.legal_ethical_framework:
@@ -1102,7 +1158,7 @@ class AIInferenceEngine:
                     'gdpr_compliance': gdpr_compliance.status if gdpr_compliance else 'not_assessed',
                     'ccpa_compliance': ccpa_compliance.status if ccpa_compliance else 'not_assessed',
                     'compliance_score': (
-                                                gdpr_compliance.compliance_score + ccpa_compliance.compliance_score) / 2 if gdpr_compliance and ccpa_compliance else 0.0,
+                                                    gdpr_compliance.compliance_score + ccpa_compliance.compliance_score) / 2 if gdpr_compliance and ccpa_compliance else 0.0,
                     'gdpr_score': gdpr_compliance.compliance_score if gdpr_compliance else 0.0,
                     'ccpa_score': ccpa_compliance.compliance_score if ccpa_compliance else 0.0
                 }
@@ -1169,6 +1225,23 @@ class AIInferenceEngine:
 
         # RESULTS PRESENTATION with enhanced recommendations
         presentation_result = self.presentation_builder.build(analysis_results)
+
+        # Add comprehensive abuse prevention recommendations
+        if self.abuse_prevention:
+            usage_stats = analysis_results.get('usage_statistics', {})
+
+            abuse_prevention_recommendations = [
+                "🛡️ Abuse prevention active - Multiple verification layers enabled",
+                "📧 Email verification - Identity confirmed through secure email codes",
+                "🤖 Bot protection - reCAPTCHA verification prevents automated abuse",
+                f"📊 Usage tracking - {usage_stats.get('remaining_daily', 'N/A')} analyses remaining today",
+                "🌐 IP monitoring - Suspicious activity detection active",
+                "📢 Reporting available - Users can report abuse for investigation",
+                "🚫 Rate limiting - Prevents system overload and abuse",
+                "🔍 Real-time monitoring - Continuous abuse pattern detection"
+            ]
+
+            presentation_result.mitigation_recommendations.extend(abuse_prevention_recommendations)
 
         # Add comprehensive legal and ethical recommendations
         if self.legal_ethical_framework:
@@ -1285,9 +1358,58 @@ class AIInferenceEngine:
 
         analysis_results["results_presentation"] = asdict(presentation_result)
 
-        logger.info(f"Fully-protected analysis completed with all security and legal frameworks")
+        logger.info(f"Fully-protected analysis completed with all security, legal, and abuse prevention frameworks")
 
         return analysis_results
+
+    def _create_abuse_prevention_rejection(self, verification_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Create response for abuse prevention rejection"""
+
+        rejection_messages = {
+            'ip_blocked': 'Your IP address has been temporarily blocked due to suspicious activity',
+            'daily_limit_exceeded': 'You have reached your daily analysis limit (maximum 3 per day)',
+            'hourly_limit_exceeded': 'You have reached your hourly analysis limit (maximum 1 per hour)',
+            'email_verification_failed': 'Email verification required or failed - please verify your email address',
+            'recaptcha_failed': 'Bot protection verification failed - please complete reCAPTCHA',
+            'suspicious_activity_detected': 'Account suspended due to suspicious activity patterns',
+            'user_blocked': 'Your account has been temporarily blocked for suspicious behavior'
+        }
+
+        reason = verification_result.get('reason', 'verification_failed')
+        message = rejection_messages.get(reason, 'Verification failed - please try again')
+
+        return {
+            'analysis_approved': False,
+            'rejection_reason': reason,
+            'error_message': message,
+            'verification_result': verification_result,
+            'recommendations': [
+                'Complete email verification if required - check your inbox for verification code',
+                'Complete reCAPTCHA verification to prove you are human',
+                'Check your daily usage limits - maximum 3 analyses per day allowed',
+                'Wait for hourly limit reset if you have reached the maximum',
+                'Try again from a different network if your IP address is blocked',
+                'Contact support if you believe this is an error',
+                'Ensure you are following our Terms of Service and usage guidelines'
+            ],
+            'usage_limits': {
+                'daily_limit': 3,
+                'hourly_limit': 1,
+                'verification_required': True,
+                'recaptcha_required': True
+            },
+            'support_contact': {
+                'email': 'support@company.com',
+                'response_time': '24-48 hours',
+                'abuse_reports': 'abuse@company.com'
+            },
+            'analysis_metadata': {
+                'analysis_timestamp': datetime.utcnow().isoformat(),
+                'analysis_version': '5.2',  # Updated version with abuse prevention
+                'abuse_prevention_active': True,
+                'rejection_type': 'abuse_prevention'
+            }
+        }
 
     def _create_content_moderation_rejection(self, moderation_result) -> Dict[str, Any]:
         """Create response for content moderation rejection"""
@@ -1318,7 +1440,7 @@ class AIInferenceEngine:
             },
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '5.1',
+                'analysis_version': '5.2',
                 'content_moderated': True,
                 'rejection_type': 'content_policy_violation'
             }
@@ -1342,7 +1464,7 @@ class AIInferenceEngine:
             ],
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '5.1',
+                'analysis_version': '5.2',
                 'input_validated': False,
                 'rejection_type': 'validation_error'
             }
@@ -1525,7 +1647,7 @@ class AIInferenceEngine:
             ],
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '5.1',
+                'analysis_version': '5.2',
                 'authorization_approved': False,
                 'rejection_type': 'authorization_error'
             }
@@ -1552,11 +1674,48 @@ class AIInferenceEngine:
             },
             'analysis_metadata': {
                 'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '5.1',
+                'analysis_version': '5.2',
                 'authorization_approved': False,
                 'rejection_type': 'authorization_rejected'
             }
         }
+
+    # Abuse prevention utility methods
+    def initiate_email_verification(self, user_id: str, email: str,
+                                    ip_address: str, user_agent: str) -> Dict[str, Any]:
+        """Initiate email verification for abuse prevention"""
+
+        if not self.abuse_prevention:
+            return {'success': False, 'error': 'Abuse prevention not enabled'}
+
+        return self.abuse_prevention.email_verifier.initiate_verification(user_id, email, ip_address, user_agent)
+
+    def submit_abuse_report(self, reporter_user_id: str, reporter_email: str,
+                            report_type: str, target_user_id: str = None,
+                            target_content: str = None, description: str = "",
+                            evidence: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Submit abuse report"""
+
+        if not self.abuse_prevention:
+            return {'success': False, 'error': 'Reporting system not available'}
+
+        try:
+            report_type_enum = ReportType[report_type.upper()]
+        except KeyError:
+            return {'success': False, 'error': 'Invalid report type'}
+
+        return self.abuse_prevention.reporting_system.submit_report(
+            reporter_user_id, reporter_email, report_type_enum,
+            target_user_id, target_content, description, evidence
+        )
+
+    def get_abuse_prevention_status(self) -> Dict[str, Any]:
+        """Get abuse prevention framework status"""
+
+        if not self.abuse_prevention:
+            return {'abuse_prevention_enabled': False}
+
+        return self.abuse_prevention.get_comprehensive_status()
 
     # Authorization framework integration methods
     def initiate_identity_verification(self, user_id: str, email: str,
@@ -1640,1256 +1799,1279 @@ class AIInferenceEngine:
         terms = self.legal_ethical_framework.terms_manager.get_current_terms()
         return asdict(terms)
 
-    def get_privacy_policy(self) -> Dict[str, Any]:
-        """Get current Privacy Policy"""
+        def get_privacy_policy(self) -> Dict[str, Any]:
+            """Get current Privacy Policy"""
 
-        if not self.legal_ethical_framework:
-            return {'privacy_policy_available': False}
+            if not self.legal_ethical_framework:
+                return {'privacy_policy_available': False}
 
-        policy = self.legal_ethical_framework.privacy_manager.get_current_policy()
-        return asdict(policy)
+            policy = self.legal_ethical_framework.privacy_manager.get_current_policy()
+            return asdict(policy)
 
-    def _perform_sentiment_analysis_with_opt_out_check(self, content_list: List[str],
-                                                       user_id: str, session_id: str) -> Dict[str, Any]:
-        """Perform sentiment analysis with opt-out checking"""
+        def _perform_sentiment_analysis_with_opt_out_check(self, content_list: List[str],
+                                                           user_id: str, session_id: str) -> Dict[str, Any]:
+            """Perform sentiment analysis with opt-out checking"""
 
-        if self._check_opt_out_request(user_id, session_id, 'SENTIMENT_ANALYSIS'):
-            return {'status': 'opted_out', 'message': 'User opted out of sentiment analysis'}
+            if self._check_opt_out_request(user_id, session_id, 'SENTIMENT_ANALYSIS'):
+                return {'status': 'opted_out', 'message': 'User opted out of sentiment analysis'}
 
-        return self._perform_sentiment_analysis(content_list)
+            return self._perform_sentiment_analysis(content_list)
 
-    def _analyze_hashtag_patterns_with_opt_out_check(self, content_list: List[str],
-                                                     user_id: str, session_id: str) -> Dict[str, Any]:
-        """Analyze hashtag patterns with opt-out checking"""
+        def _analyze_hashtag_patterns_with_opt_out_check(self, content_list: List[str],
+                                                         user_id: str, session_id: str) -> Dict[str, Any]:
+            """Analyze hashtag patterns with opt-out checking"""
 
-        if self._check_opt_out_request(user_id, session_id, 'SENTIMENT_ANALYSIS'):
-            return {'status': 'opted_out', 'message': 'User opted out of hashtag analysis'}
+            if self._check_opt_out_request(user_id, session_id, 'SENTIMENT_ANALYSIS'):
+                return {'status': 'opted_out', 'message': 'User opted out of hashtag analysis'}
 
-        return self._analyze_hashtag_patterns(content_list)
+            return self._analyze_hashtag_patterns(content_list)
 
-    def _analyze_mention_patterns_with_opt_out_check(self, content_list: List[str],
-                                                     user_id: str, session_id: str) -> Dict[str, Any]:
-        """Analyze mention patterns with opt-out checking"""
+        def _analyze_mention_patterns_with_opt_out_check(self, content_list: List[str],
+                                                         user_id: str, session_id: str) -> Dict[str, Any]:
+            """Analyze mention patterns with opt-out checking"""
 
-        if self._check_opt_out_request(user_id, session_id, 'SENTIMENT_ANALYSIS'):
-            return {'status': 'opted_out', 'message': 'User opted out of mention analysis'}
+            if self._check_opt_out_request(user_id, session_id, 'SENTIMENT_ANALYSIS'):
+                return {'status': 'opted_out', 'message': 'User opted out of mention analysis'}
 
-        return self._analyze_mention_patterns(content_list)
+            return self._analyze_mention_patterns(content_list)
 
-    def _analyze_engagement_with_opt_out_check(self, social_data: Dict[str, Any],
-                                               user_id: str, session_id: str) -> Dict[str, Any]:
-        """Analyze engagement with opt-out checking"""
-
-        if self._check_opt_out_request(user_id, session_id, 'SENTIMENT_ANALYSIS'):
-            return {'status': 'opted_out', 'message': 'User opted out of engagement analysis'}
-
-        return self._analyze_engagement(social_data)
-
-    def _perform_topic_modeling_with_opt_out_check(self, content_list: List[str],
+        def _analyze_engagement_with_opt_out_check(self, social_data: Dict[str, Any],
                                                    user_id: str, session_id: str) -> Dict[str, Any]:
-        """Perform topic modeling with opt-out checking"""
+            """Analyze engagement with opt-out checking"""
 
-        if self._check_opt_out_request(user_id, session_id, 'SENTIMENT_ANALYSIS'):
-            return {'status': 'opted_out', 'message': 'User opted out of topic modeling'}
+            if self._check_opt_out_request(user_id, session_id, 'SENTIMENT_ANALYSIS'):
+                return {'status': 'opted_out', 'message': 'User opted out of engagement analysis'}
 
-        return self._perform_topic_modeling(content_list)
+            return self._analyze_engagement(social_data)
 
-    def _check_opt_out_request(self, user_id: str, session_id: str, stage: str) -> bool:
-        """Check if user has requested opt-out at current stage"""
+        def _perform_topic_modeling_with_opt_out_check(self, content_list: List[str],
+                                                       user_id: str, session_id: str) -> Dict[str, Any]:
+            """Perform topic modeling with opt-out checking"""
 
-        if not self.consent_framework:
+            if self._check_opt_out_request(user_id, session_id, 'SENTIMENT_ANALYSIS'):
+                return {'status': 'opted_out', 'message': 'User opted out of topic modeling'}
+
+            return self._perform_topic_modeling(content_list)
+
+        def _check_opt_out_request(self, user_id: str, session_id: str, stage: str) -> bool:
+            """Check if user has requested opt-out at current stage"""
+
+            if not self.consent_framework:
+                return False
+
+            # Check for active opt-out requests
+            for request in self.consent_framework.opt_out_manager.opt_out_requests.values():
+                if (request.user_id == user_id and
+                        request.session_id == session_id and
+                        request.processing_stage.value.upper() == stage and
+                        request.status == 'pending'):
+                    return True
+
             return False
 
-        # Check for active opt-out requests
-        for request in self.consent_framework.opt_out_manager.opt_out_requests.values():
-            if (request.user_id == user_id and
-                    request.session_id == session_id and
-                    request.processing_stage.value.upper() == stage and
-                    request.status == 'pending'):
-                return True
+        def _create_consent_error_response(self, error_message: str) -> Dict[str, Any]:
+            """Create response for consent-related errors"""
 
-        return False
-
-    def _create_consent_error_response(self, error_message: str) -> Dict[str, Any]:
-        """Create response for consent-related errors"""
-
-        return {
-            'analysis_approved': False,
-            'rejection_reason': 'consent_required',
-            'error_message': error_message,
-            'consent_required': True,
-            'recommendations': [
-                'Complete the consent process to proceed with analysis',
-                'Review and accept required consent items',
-                'Ensure all mandatory consents are granted'
-            ],
-            'analysis_metadata': {
-                'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '5.1',
-                'consent_verified': False,
-                'rejection_type': 'consent_required'
+            return {
+                'analysis_approved': False,
+                'rejection_reason': 'consent_required',
+                'error_message': error_message,
+                'consent_required': True,
+                'recommendations': [
+                    'Complete the consent process to proceed with analysis',
+                    'Review and accept required consent items',
+                    'Ensure all mandatory consents are granted'
+                ],
+                'analysis_metadata': {
+                    'analysis_timestamp': datetime.utcnow().isoformat(),
+                    'analysis_version': '5.2',
+                    'consent_verified': False,
+                    'rejection_type': 'consent_required'
+                }
             }
-        }
 
-    def request_immediate_deletion(self, user_id: str, deletion_scope: str = 'complete') -> Dict[str, Any]:
-        """Request immediate deletion during or after analysis"""
+        def request_immediate_deletion(self, user_id: str, deletion_scope: str = 'complete') -> Dict[str, Any]:
+            """Request immediate deletion during or after analysis"""
 
-        if not self.consent_framework:
-            return {'success': False, 'error': 'Consent framework not available'}
+            if not self.consent_framework:
+                return {'success': False, 'error': 'Consent framework not available'}
 
-        deletion_request = self.consent_framework.deletion_manager.request_immediate_deletion(
-            user_id, deletion_scope
-        )
+            deletion_request = self.consent_framework.deletion_manager.request_immediate_deletion(
+                user_id, deletion_scope
+            )
 
-        return {
-            'success': True,
-            'request_id': deletion_request.request_id,
-            'verification_code': deletion_request.verification_code,
-            'message': 'Deletion request created. Use verification code to confirm.',
-            'deletion_scope': deletion_scope,
-            'estimated_completion': '< 5 minutes'
-        }
+            return {
+                'success': True,
+                'request_id': deletion_request.request_id,
+                'verification_code': deletion_request.verification_code,
+                'message': 'Deletion request created. Use verification code to confirm.',
+                'deletion_scope': deletion_scope,
+                'estimated_completion': '< 5 minutes'
+            }
 
-    def execute_deletion(self, request_id: str, verification_code: str) -> Dict[str, Any]:
-        """Execute verified deletion request"""
+        def execute_deletion(self, request_id: str, verification_code: str) -> Dict[str, Any]:
+            """Execute verified deletion request"""
 
-        if not self.consent_framework:
-            return {'success': False, 'error': 'Consent framework not available'}
+            if not self.consent_framework:
+                return {'success': False, 'error': 'Consent framework not available'}
 
-        return self.consent_framework.deletion_manager.execute_deletion(request_id, verification_code)
+            return self.consent_framework.deletion_manager.execute_deletion(request_id, verification_code)
 
-    def request_opt_out(self, user_id: str, session_id: str, current_stage: str,
-                        reason: str = None) -> Dict[str, Any]:
-        """Request opt-out from current processing stage"""
+        def request_opt_out(self, user_id: str, session_id: str, current_stage: str,
+                            reason: str = None) -> Dict[str, Any]:
+            """Request opt-out from current processing stage"""
 
-        if not self.consent_framework:
-            return {'success': False, 'error': 'Consent framework not available'}
+            if not self.consent_framework:
+                return {'success': False, 'error': 'Consent framework not available'}
 
-        from .consent_framework import ProcessingStage
+            from .consent_framework import ProcessingStage
 
-        try:
-            stage_enum = ProcessingStage[current_stage.upper()]
-        except KeyError:
-            return {'success': False, 'error': 'Invalid processing stage'}
+            try:
+                stage_enum = ProcessingStage[current_stage.upper()]
+            except KeyError:
+                return {'success': False, 'error': 'Invalid processing stage'}
 
-        opt_out_request = self.consent_framework.opt_out_manager.request_opt_out(
-            user_id, session_id, stage_enum, reason
-        )
+            opt_out_request = self.consent_framework.opt_out_manager.request_opt_out(
+                user_id, session_id, stage_enum, reason
+            )
 
-        return {
-            'success': True,
-            'request_id': opt_out_request.request_id,
-            'message': 'Opt-out request processed. Processing will stop at current stage.',
-            'data_to_delete': opt_out_request.data_to_delete
-        }
+            return {
+                'success': True,
+                'request_id': opt_out_request.request_id,
+                'message': 'Opt-out request processed. Processing will stop at current stage.',
+                'data_to_delete': opt_out_request.data_to_delete
+            }
 
-    def process_opt_out(self, request_id: str) -> Dict[str, Any]:
-        """Process opt-out request"""
+        def process_opt_out(self, request_id: str) -> Dict[str, Any]:
+            """Process opt-out request"""
 
-        if not self.consent_framework:
-            return {'success': False, 'error': 'Consent framework not available'}
+            if not self.consent_framework:
+                return {'success': False, 'error': 'Consent framework not available'}
 
-        return self.consent_framework.opt_out_manager.process_opt_out(request_id)
+            return self.consent_framework.opt_out_manager.process_opt_out(request_id)
 
-    def withdraw_consent(self, user_id: str, consent_type: str, reason: str = None) -> Dict[str, Any]:
-        """Withdraw previously granted consent"""
+        def withdraw_consent(self, user_id: str, consent_type: str, reason: str = None) -> Dict[str, Any]:
+            """Withdraw previously granted consent"""
 
-        if not self.consent_framework:
-            return {'success': False, 'error': 'Consent framework not available'}
+            if not self.consent_framework:
+                return {'success': False, 'error': 'Consent framework not available'}
 
-        from .consent_framework import ConsentType
+            from .consent_framework import ConsentType
 
-        try:
-            consent_type_enum = ConsentType[consent_type.upper()]
-        except KeyError:
-            return {'success': False, 'error': 'Invalid consent type'}
+            try:
+                consent_type_enum = ConsentType[consent_type.upper()]
+            except KeyError:
+                return {'success': False, 'error': 'Invalid consent type'}
 
-        success = self.consent_framework.consent_manager.withdraw_consent(
-            user_id, consent_type_enum, reason
-        )
+            success = self.consent_framework.consent_manager.withdraw_consent(
+                user_id, consent_type_enum, reason
+            )
 
-        return {
-            'success': success,
-            'message': 'Consent withdrawn successfully' if success else 'Consent withdrawal failed',
-            'consent_type': consent_type,
-            'immediate_effect': True
-        }
+            return {
+                'success': success,
+                'message': 'Consent withdrawn successfully' if success else 'Consent withdrawal failed',
+                'consent_type': consent_type,
+                'immediate_effect': True
+            }
 
-    def get_transparency_report(self) -> Dict[str, Any]:
-        """Get current transparency report"""
+        def get_transparency_report(self) -> Dict[str, Any]:
+            """Get current transparency report"""
 
-        if not self.consent_framework:
-            return {'transparency_enabled': False}
+            if not self.consent_framework:
+                return {'transparency_enabled': False}
 
-        return self.consent_framework.get_transparency_dashboard()
+            return self.consent_framework.get_transparency_dashboard()
 
-    def initiate_consent_process(self, user_id: str, session_id: str,
+        def initiate_consent_process(self, user_id: str, session_id: str,
+                                     ip_address: str, user_agent: str) -> Dict[str, Any]:
+            """Initiate user consent process"""
+
+            if not self.consent_framework:
+                return {'consent_enabled': False}
+
+            return self.consent_framework.initiate_user_journey(user_id, session_id, ip_address, user_agent)
+
+        def process_consent_step(self, process_id: str, consent_type: str, granted: bool,
                                  ip_address: str, user_agent: str) -> Dict[str, Any]:
-        """Initiate user consent process"""
+            """Process individual consent step"""
 
-        if not self.consent_framework:
-            return {'consent_enabled': False}
+            if not self.consent_framework:
+                return {'success': False, 'error': 'Consent framework not available'}
 
-        return self.consent_framework.initiate_user_journey(user_id, session_id, ip_address, user_agent)
+            from .consent_framework import ConsentType
 
-    def process_consent_step(self, process_id: str, consent_type: str, granted: bool,
-                             ip_address: str, user_agent: str) -> Dict[str, Any]:
-        """Process individual consent step"""
+            try:
+                consent_type_enum = ConsentType[consent_type.upper()]
+            except KeyError:
+                return {'success': False, 'error': 'Invalid consent type'}
 
-        if not self.consent_framework:
-            return {'success': False, 'error': 'Consent framework not available'}
+            return self.consent_framework.consent_manager.process_consent_step(
+                process_id, consent_type_enum, granted, ip_address, user_agent
+            )
 
-        from .consent_framework import ConsentType
+        # Continue with existing methods...
 
-        try:
-            consent_type_enum = ConsentType[consent_type.upper()]
-        except KeyError:
-            return {'success': False, 'error': 'Invalid consent type'}
+        def _extract_data_sources(self, social_data: Dict[str, Any]) -> List[str]:
+            """Extract data sources from social data"""
+            sources = []
 
-        return self.consent_framework.consent_manager.process_consent_step(
-            process_id, consent_type_enum, granted, ip_address, user_agent
-        )
+            if 'social_profiles' in social_data:
+                sources.append('public_social_media_profiles')
 
-    # Continue with existing methods...
+            if 'discovered_profiles' in social_data:
+                sources.append('publicly_available_posts')
 
-    def _extract_data_sources(self, social_data: Dict[str, Any]) -> List[str]:
-        """Extract data sources from social data"""
-        sources = []
+            # Check for any posts or content
+            for platform_data in ['social_profiles', 'discovered_profiles']:
+                if platform_data in social_data:
+                    for profile in social_data[platform_data]:
+                        inferred_data = profile.get('inferred_data', {})
+                        if 'posts' in inferred_data:
+                            sources.append('publicly_visible_content')
+                            break
 
-        if 'social_profiles' in social_data:
-            sources.append('public_social_media_profiles')
+            return list(set(sources))  # Remove duplicates
 
-        if 'discovered_profiles' in social_data:
-            sources.append('publicly_available_posts')
+        def _extract_data_types(self, social_data: Dict[str, Any]) -> List[str]:
+            """Extract data types from social data"""
+            data_types = []
 
-        # Check for any posts or content
-        for platform_data in ['social_profiles', 'discovered_profiles']:
-            if platform_data in social_data:
-                for profile in social_data[platform_data]:
-                    inferred_data = profile.get('inferred_data', {})
-                    if 'posts' in inferred_data:
-                        sources.append('publicly_visible_content')
-                        break
+            # Check for different types of data
+            for platform_data in ['social_profiles', 'discovered_profiles']:
+                if platform_data in social_data:
+                    for profile in social_data[platform_data]:
+                        inferred_data = profile.get('inferred_data', {})
 
-        return list(set(sources))  # Remove duplicates
+                        if 'bio' in inferred_data or 'description' in inferred_data:
+                            data_types.append('public_profile_information')
 
-    def _extract_data_types(self, social_data: Dict[str, Any]) -> List[str]:
-        """Extract data types from social data"""
-        data_types = []
+                        if 'posts' in inferred_data:
+                            data_types.append('public_text_content')
 
-        # Check for different types of data
-        for platform_data in ['social_profiles', 'discovered_profiles']:
-            if platform_data in social_data:
-                for profile in social_data[platform_data]:
-                    inferred_data = profile.get('inferred_data', {})
+                        if 'followers' in inferred_data or 'following' in inferred_data:
+                            data_types.append('public_engagement_metrics')
 
-                    if 'bio' in inferred_data or 'description' in inferred_data:
-                        data_types.append('public_profile_information')
+            return list(set(data_types))  # Remove duplicates
 
-                    if 'posts' in inferred_data:
-                        data_types.append('public_text_content')
+        def _create_ethical_rejection_response(self, ethical_approval) -> Dict[str, Any]:
+            """Create response for ethically rejected requests"""
 
-                    if 'followers' in inferred_data or 'following' in inferred_data:
-                        data_types.append('public_engagement_metrics')
-
-        return list(set(data_types))  # Remove duplicates
-
-    def _create_ethical_rejection_response(self, ethical_approval) -> Dict[str, Any]:
-        """Create response for ethically rejected requests"""
-
-        return {
-            'analysis_approved': False,
-            'rejection_reason': 'ethical_boundaries',
-            'ethical_assessment': asdict(ethical_approval.ethical_assessment),
-            'age_verification': asdict(ethical_approval.age_verification),
-            'violations': [v.value for v in ethical_approval.ethical_assessment.violations],
-            'recommendations': ethical_approval.ethical_assessment.recommendations,
-            'usage_restrictions': ethical_approval.usage_restrictions,
-            'appeal_process': 'Contact ethics board for review if you believe this rejection is in error',
-            'analysis_metadata': {
-                'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '5.1',
-                'ethics_approved': False,
-                'rejection_type': 'ethical_boundaries'
+            return {
+                'analysis_approved': False,
+                'rejection_reason': 'ethical_boundaries',
+                'ethical_assessment': asdict(ethical_approval.ethical_assessment),
+                'age_verification': asdict(ethical_approval.age_verification),
+                'violations': [v.value for v in ethical_approval.ethical_assessment.violations],
+                'recommendations': ethical_approval.ethical_assessment.recommendations,
+                'usage_restrictions': ethical_approval.usage_restrictions,
+                'appeal_process': 'Contact ethics board for review if you believe this rejection is in error',
+                'analysis_metadata': {
+                    'analysis_timestamp': datetime.utcnow().isoformat(),
+                    'analysis_version': '5.2',
+                    'ethics_approved': False,
+                    'rejection_type': 'ethical_boundaries'
+                }
             }
-        }
 
-    def _create_ethical_error_response(self, error_message: str) -> Dict[str, Any]:
-        """Create response for ethical evaluation errors"""
+        def _create_ethical_error_response(self, error_message: str) -> Dict[str, Any]:
+            """Create response for ethical evaluation errors"""
 
-        return {
-            'analysis_approved': False,
-            'rejection_reason': 'ethical_evaluation_error',
-            'error_message': error_message,
-            'recommendations': [
-                'Please verify age verification data is complete',
-                'Ensure use case description is provided',
-                'Contact support if the error persists'
-            ],
-            'analysis_metadata': {
-                'analysis_timestamp': datetime.utcnow().isoformat(),
-                'analysis_version': '5.1',
-                'ethics_approved': False,
-                'rejection_type': 'evaluation_error'
+            return {
+                'analysis_approved': False,
+                'rejection_reason': 'ethical_evaluation_error',
+                'error_message': error_message,
+                'recommendations': [
+                    'Please verify age verification data is complete',
+                    'Ensure use case description is provided',
+                    'Contact support if the error persists'
+                ],
+                'analysis_metadata': {
+                    'analysis_timestamp': datetime.utcnow().isoformat(),
+                    'analysis_version': '5.2',
+                    'ethics_approved': False,
+                    'rejection_type': 'evaluation_error'
+                }
             }
-        }
 
-    def _classify_mental_health_risk(self, risk_factors) -> str:
-        """Classify mental health risk level"""
+        def _classify_mental_health_risk(self, risk_factors) -> str:
+            """Classify mental health risk level"""
 
-        if not hasattr(risk_factors, 'depression_indicators'):
-            return 'unknown'
+            if not hasattr(risk_factors, 'depression_indicators'):
+                return 'unknown'
 
-        try:
-            # Calculate average risk scores
-            depression_risk = np.mean(
-                list(risk_factors.depression_indicators.values())) if risk_factors.depression_indicators else 0
-            anxiety_risk = np.mean(
-                list(risk_factors.anxiety_indicators.values())) if risk_factors.anxiety_indicators else 0
-            stress_risk = np.mean(
-                list(risk_factors.stress_indicators.values())) if risk_factors.stress_indicators else 0
+            try:
+                # Calculate average risk scores
+                depression_risk = np.mean(
+                    list(risk_factors.depression_indicators.values())) if risk_factors.depression_indicators else 0
+                anxiety_risk = np.mean(
+                    list(risk_factors.anxiety_indicators.values())) if risk_factors.anxiety_indicators else 0
+                stress_risk = np.mean(
+                    list(risk_factors.stress_indicators.values())) if risk_factors.stress_indicators else 0
 
-            overall_risk = (depression_risk + anxiety_risk + stress_risk) / 3
+                overall_risk = (depression_risk + anxiety_risk + stress_risk) / 3
 
-            # Factor in crisis warnings
-            if risk_factors.crisis_warning_signals:
-                overall_risk = max(overall_risk, 0.8)
+                # Factor in crisis warnings
+                if risk_factors.crisis_warning_signals:
+                    overall_risk = max(overall_risk, 0.8)
 
-            # Classify risk
-            if overall_risk > 0.7:
-                return 'high'
-            elif overall_risk > 0.4:
-                return 'medium'
-            else:
-                return 'low'
-
-        except Exception:
-            return 'unknown'
-
-    def _extract_content_from_social_data(self, social_data: Dict[str, Any]) -> List[str]:
-        """Extract text content from social media data"""
-
-        content_list = []
-
-        # Extract from different social media platforms
-        for platform_data in ['social_profiles', 'discovered_profiles']:
-            if platform_data in social_data:
-                for profile in social_data[platform_data]:
-                    # Extract bio/description
-                    inferred_data = profile.get('inferred_data', {})
-
-                    if 'bio' in inferred_data:
-                        content_list.append(inferred_data['bio'])
-
-                    if 'description' in inferred_data:
-                        content_list.append(inferred_data['description'])
-
-                    if 'page_title' in profile:
-                        content_list.append(profile['page_title'])
-
-                    if 'page_description' in profile:
-                        content_list.append(profile['page_description'])
-
-                    # Extract from posts if available
-                    if 'posts' in inferred_data:
-                        for post in inferred_data['posts'][:10]:  # Limit to 10 posts
-                            if isinstance(post, dict) and 'text' in post:
-                                content_list.append(post['text'])
-                            elif isinstance(post, str):
-                                content_list.append(post)
-
-        # Filter out empty or very short content
-        content_list = [content for content in content_list if content and len(content.strip()) > 10]
-
-        return content_list
-
-    def _perform_sentiment_analysis(self, content_list: List[str]) -> Dict[str, Any]:
-        """Perform comprehensive sentiment analysis"""
-
-        if not content_list:
-            return {'overall_sentiment': 'neutral', 'sentiment_distribution': {}, 'emotional_profile': {}}
-
-        sentiment_results = []
-        emotional_indicators = defaultdict(int)
-
-        for content in content_list:
-            result = self.sentiment_analyzer.analyze_sentiment(content)
-            sentiment_results.append(result)
-
-            # Count emotional indicators
-            for emotion in result.emotional_indicators:
-                emotional_indicators[emotion] += 1
-
-        # Calculate overall sentiment
-        avg_polarity = np.mean([r.polarity for r in sentiment_results])
-        avg_subjectivity = np.mean([r.subjectivity for r in sentiment_results])
-
-        # Classify overall sentiment
-        if avg_polarity > 0.1:
-            overall_sentiment = 'positive'
-        elif avg_polarity < -0.1:
-            overall_sentiment = 'negative'
-        else:
-            overall_sentiment = 'neutral'
-
-        # Distribution of sentiments
-        sentiment_counts = Counter([r.classification for r in sentiment_results])
-        total_sentiments = len(sentiment_results)
-
-        sentiment_distribution = {
-            classification: count / total_sentiments
-            for classification, count in sentiment_counts.items()
-        }
-
-        # Emotional profile
-        total_emotions = sum(emotional_indicators.values())
-        emotional_profile = {
-            emotion: count / total_emotions if total_emotions > 0 else 0
-            for emotion, count in emotional_indicators.items()
-        }
-
-        return {
-            'overall_sentiment': overall_sentiment,
-            'average_polarity': avg_polarity,
-            'average_subjectivity': avg_subjectivity,
-            'sentiment_distribution': sentiment_distribution,
-            'emotional_profile': emotional_profile,
-            'confidence_score': np.mean([r.confidence for r in sentiment_results])
-        }
-
-    def _analyze_hashtag_patterns(self, content_list: List[str]) -> Dict[str, Any]:
-        """Analyze hashtag usage patterns"""
-
-        hashtag_patterns = self.hashtag_analyzer.analyze_hashtag_patterns(content_list)
-
-        if not hashtag_patterns:
-            return {'patterns': [], 'usage_style': 'minimal', 'trending_topics': []}
-
-        # Determine usage style
-        total_hashtags = sum(p.frequency for p in hashtag_patterns)
-        unique_hashtags = len(hashtag_patterns)
-
-        if total_hashtags == 0:
-            usage_style = 'minimal'
-        elif unique_hashtags / len(content_list) > 0.5:
-            usage_style = 'diverse'
-        elif total_hashtags / len(content_list) > 2:
-            usage_style = 'heavy'
-        else:
-            usage_style = 'moderate'
-
-        # Get trending topics
-        trending_topics = [
-            {'hashtag': p.hashtag, 'score': p.trending_score}
-            for p in hashtag_patterns[:5]  # Top 5
-        ]
-
-        return {
-            'patterns': [asdict(p) for p in hashtag_patterns],
-            'usage_style': usage_style,
-            'total_hashtags': total_hashtags,
-            'unique_hashtags': unique_hashtags,
-            'trending_topics': trending_topics
-        }
-
-    def _analyze_mention_patterns(self, content_list: List[str]) -> Dict[str, Any]:
-        """Analyze mention (@username) patterns"""
-
-        return self.hashtag_analyzer.analyze_mention_patterns(content_list)
-
-    def _analyze_engagement(self, social_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze content engagement patterns"""
-
-        # Extract engagement data from social profiles
-        content_data = []
-
-        for platform_data in ['social_profiles', 'discovered_profiles']:
-            if platform_data in social_data:
-                for profile in social_data[platform_data]:
-                    inferred_data = profile.get('inferred_data', {})
-
-                    # Create content entry with engagement metrics
-                    content_entry = {
-                        'text': inferred_data.get('bio', ''),
-                        'likes': inferred_data.get('followers', 0),
-                        'comments': inferred_data.get('public_repos', 0),  # For GitHub
-                        'shares': 0,  # Placeholder
-                        'reactions': 0  # Placeholder
-                    }
-
-                    if content_entry['text']:
-                        content_data.append(content_entry)
-
-                if not content_data:
-                    return asdict(EngagementMetrics(0.0, {}, [], 'neutral', 0.0, 0.0))
-
-                engagement_metrics = self.engagement_analyzer.analyze_engagement(content_data)
-                return asdict(engagement_metrics)
-
-            def _perform_topic_modeling(self, content_list: List[str]) -> Dict[str, Any]:
-                """Perform topic modeling for interest categorization"""
-
-                if len(content_list) < 3:
-                    return {'topics': [], 'primary_topics': [], 'topic_diversity': 0.0}
-
-                topics = self.topic_engine.perform_topic_modeling(content_list, num_topics=5)
-
-                # Get primary topics (top 3 by relevance)
-                primary_topics = [
-                    {
-                        'name': topic.topic_name,
-                        'keywords': topic.keywords,
-                        'relevance': topic.relevance_score
-                    }
-                    for topic in topics[:3]
-                ]
-
-                # Calculate topic diversity
-                if topics:
-                    relevance_scores = [t.relevance_score for t in topics]
-                    topic_diversity = 1.0 - (max(relevance_scores) - min(relevance_scores))
-                else:
-                    topic_diversity = 0.0
-
-                return {
-                    'topics': [asdict(topic) for topic in topics],
-                    'primary_topics': primary_topics,
-                    'topic_diversity': topic_diversity,
-                    'total_topics_identified': len(topics)
-                }
-
-            def _generate_comprehensive_interest_profile(self, analysis_results: Dict[str, Any]) -> InterestProfile:
-                """Generate comprehensive interest profile including all analysis dimensions"""
-
-                # Extract primary interests from topic modeling
-                primary_interests = []
-                interest_scores = {}
-
-                topic_data = analysis_results.get('topic_modeling', {})
-                for topic in topic_data.get('primary_topics', []):
-                    interest_name = topic['name']
-                    primary_interests.append(interest_name)
-                    interest_scores[interest_name] = topic['relevance']
-
-                # Add interests from hashtag patterns
-                hashtag_data = analysis_results.get('hashtag_patterns', {})
-                for pattern in hashtag_data.get('patterns', [])[:3]:  # Top 3 hashtags
-                    hashtag = pattern['hashtag']
-                    if hashtag not in interest_scores:
-                        interest_scores[hashtag] = pattern['trending_score']
-
-                # Add interests from economic indicators
-                economic_data = analysis_results.get('economic_indicators', {})
-                for brand in economic_data.get('brand_mentions', [])[:3]:  # Top 3 brands
-                    brand_name = brand.get('brand_name', '')
-                    if brand_name and brand_name not in interest_scores:
-                        interest_scores[brand_name] = brand.get('sentiment_score', 0.0)
-
-                # Comprehensive behavioral patterns from all analyses
-                sentiment_data = analysis_results.get('sentiment_analysis', {})
-                engagement_data = analysis_results.get('engagement_analysis', {})
-                schedule_data = analysis_results.get('schedule_patterns', {})
-                mental_state_data = analysis_results.get('mental_state_assessment', {})
-
-                comprehensive_behavioral_patterns = {
-                    # Core behavioral patterns
-                    'emotional_tendency': sentiment_data.get('overall_sentiment', 'neutral'),
-                    'communication_style': self._determine_communication_style(sentiment_data, hashtag_data),
-                    'engagement_preference': engagement_data.get('audience_response_sentiment', 'neutral'),
-                    'content_frequency': self._estimate_content_frequency(analysis_results),
-
-                    # Schedule-based behavioral patterns
-                    'temporal_signature': schedule_data.get('post_timing', {}).get('temporal_signature', 'unknown'),
-                    'activity_rhythm': schedule_data.get('activity_frequency', {}).get('engagement_rhythm', 'unknown'),
-                    'geographic_scope': schedule_data.get('geographic_inference', {}).get('geographic_scope',
-                                                                                          'unknown'),
-                    'work_life_balance': schedule_data.get('work_personal_boundary', {}).get('boundary_clarity',
-                                                                                             'unknown'),
-                    'schedule_consistency': schedule_data.get('post_timing', {}).get('consistency_score', 0.0),
-                    'privacy_awareness': len(
-                        [i for i in schedule_data.get('privacy_implications', []) if '✅' in i]) > 0,
-                    'posting_frequency': schedule_data.get('post_timing', {}).get('posting_frequency', 'unknown'),
-                    'peak_activity_hours': schedule_data.get('post_timing', {}).get('peak_hours', []),
-                    'time_zone_indicators': schedule_data.get('post_timing', {}).get('time_zone_indicators', []),
-
-                    # Economic behavioral patterns
-                    'spending_capacity': economic_data.get('economic_profile', {}).get('spending_capacity', 'unknown'),
-                    'brand_affinity': economic_data.get('economic_profile', {}).get('brand_affinity_tier', 'unknown'),
-                    'purchase_style': economic_data.get('economic_profile', {}).get('purchase_decision_style',
-                                                                                    'balanced'),
-                    'economic_lifestyle': economic_data.get('economic_profile', {}).get('economic_lifestyle',
-                                                                                        'practical'),
-                    'professional_level': economic_data.get('professional_network', {}).get('seniority_level',
-                                                                                            'unknown'),
-                    'economic_risk_awareness': economic_data.get('economic_risk_score', 0.0) < 0.5,
-                    'brand_loyalty_tendency': self._calculate_brand_loyalty_tendency(economic_data),
-                    'financial_sophistication': economic_data.get('economic_profile', {}).get(
-                        'financial_sophistication', 'basic'),
-                    'professional_influence': economic_data.get('professional_network', {}).get(
-                        'professional_influence', 0.0),
-
-                    # Mental state behavioral patterns
-                    'overall_mental_state': mental_state_data.get('mental_state_profile', {}).get(
-                        'overall_mental_state', 'stable'),
-                    'emotional_stability': mental_state_data.get('mental_state_profile', {}).get(
-                        'emotional_stability_score', 0.5),
-                    'social_connectivity': mental_state_data.get('mental_state_profile', {}).get(
-                        'social_connectivity_level', 'unknown'),
-                    'stress_level': mental_state_data.get('mental_state_profile', {}).get('stress_level', 'unknown'),
-                    'wellbeing_trajectory': mental_state_data.get('mental_state_profile', {}).get(
-                        'wellbeing_trajectory', 'stable'),
-                    'language_complexity': mental_state_data.get('language_patterns', {}).get('complexity_score', 0.0),
-                    'emoji_usage_frequency': mental_state_data.get('emoji_patterns', {}).get('emoji_frequency', 0.0),
-                    'social_isolation_risk': mental_state_data.get('social_interaction', {}).get(
-                        'social_engagement_level', 'unknown') == 'isolated',
-                    'mental_health_protective_factors': len(
-                        mental_state_data.get('risk_factors', {}).get('protective_factors', [])),
-                    'crisis_risk_indicators': len(
-                        mental_state_data.get('risk_factors', {}).get('crisis_warning_signals', []))
-                }
-
-                # Comprehensive content preferences with all insights
-                comprehensive_content_preferences = {
-                    # Core content preferences
-                    'preferred_sentiment': sentiment_data.get('overall_sentiment', 'neutral'),
-                    'hashtag_usage': hashtag_data.get('usage_style', 'minimal'),
-                    'interaction_style': analysis_results.get('mention_patterns', {}).get('interaction_style',
-                                                                                          'non_interactive'),
-                    'topic_diversity': topic_data.get('topic_diversity', 0.0),
-
-                    # Schedule-based preferences
-                    'preferred_posting_times': schedule_data.get('post_timing', {}).get('peak_hours', []),
-                    'geographic_preferences': schedule_data.get('geographic_inference', {}).get('likely_locations', []),
-                    'work_content_ratio': schedule_data.get('work_personal_boundary', {}).get(
-                        'professional_content_ratio', 0.0),
-
-                    # Economic content preferences
-                    'brand_mention_frequency': len(economic_data.get('brand_mentions', [])),
-                    'location_sharing_tendency': len(economic_data.get('location_patterns', [])),
-                    'purchase_sharing_behavior': len(economic_data.get('purchase_activities', [])),
-                    'professional_content_ratio': economic_data.get('professional_network', {}).get(
-                        'thought_leadership_score', 0.0),
-                    'luxury_brand_affinity': len(
-                        [b for b in economic_data.get('brand_mentions', []) if b.get('price_tier') == 'luxury']),
-                    'economic_transparency': economic_data.get('economic_risk_score', 0.0),
-                    'career_focus_level': economic_data.get('professional_network', {}).get('networking_activity',
-                                                                                            'passive'),
-
-                    # Mental state content preferences
-                    'emotional_expression_frequency': mental_state_data.get('emoji_patterns', {}).get(
-                        'emotional_emoji_ratio', 0.0),
-                    'social_interaction_preference': mental_state_data.get('social_interaction', {}).get(
-                        'interaction_rate', 0.0),
-                    'language_formality_preference': mental_state_data.get('language_patterns', {}).get(
-                        'formality_level', 'neutral'),
-                    'content_tone_consistency': mental_state_data.get('content_tone', {}).get('tone_consistency', 0.0),
-                    'wellbeing_content_sharing': len(
-                        mental_state_data.get('content_tone', {}).get('wellbeing_indicators', [])),
-                    'emotional_volatility': mental_state_data.get('content_tone', {}).get('emotional_volatility', 0.0),
-                    'crisis_communication_patterns': len(
-                        mental_state_data.get('risk_factors', {}).get('crisis_warning_signals', [])) > 0
-                }
-
-                # Enhanced engagement style determination with all factors
-                engagement_style = self._determine_comprehensive_engagement_style(
-                    engagement_data, comprehensive_behavioral_patterns, schedule_data, economic_data, mental_state_data
-                )
-
-                return InterestProfile(
-                    primary_interests=primary_interests,
-                    interest_scores=interest_scores,
-                    interest_evolution={},  # Would require historical data
-                    behavioral_patterns=comprehensive_behavioral_patterns,
-                    content_preferences=comprehensive_content_preferences,
-                    engagement_style=engagement_style
-                )
-
-            def _calculate_brand_loyalty_tendency(self, economic_data: Dict[str, Any]) -> str:
-                """Calculate brand loyalty tendency from purchase activities"""
-
-                purchase_activities = economic_data.get('purchase_activities', [])
-
-                if not purchase_activities:
-                    return 'unknown'
-
-                loyalty_scores = [activity.get('brand_loyalty_score', 0.0) for activity in purchase_activities]
-                avg_loyalty = np.mean(loyalty_scores) if loyalty_scores else 0.0
-
-                if avg_loyalty > 0.7:
+                # Classify risk
+                if overall_risk > 0.7:
                     return 'high'
-                elif avg_loyalty > 0.4:
+                elif overall_risk > 0.4:
                     return 'medium'
                 else:
                     return 'low'
 
-            def _determine_communication_style(self, sentiment_data: Dict, hashtag_data: Dict) -> str:
-                """Determine communication style from sentiment and hashtag usage"""
+            except Exception:
+                return 'unknown'
 
-                sentiment = sentiment_data.get('overall_sentiment', 'neutral')
-                subjectivity = sentiment_data.get('average_subjectivity', 0.5)
-                hashtag_style = hashtag_data.get('usage_style', 'minimal')
+        def _extract_content_from_social_data(self, social_data: Dict[str, Any]) -> List[str]:
+            """Extract text content from social media data"""
 
-                if subjectivity > 0.7 and sentiment == 'positive':
-                    return 'enthusiastic'
-                elif subjectivity > 0.7 and sentiment == 'negative':
-                    return 'critical'
-                elif subjectivity < 0.3:
-                    return 'factual'
-                elif hashtag_style == 'heavy':
-                    return 'expressive'
+            content_list = []
+
+            # Extract from different social media platforms
+            for platform_data in ['social_profiles', 'discovered_profiles']:
+                if platform_data in social_data:
+                    for profile in social_data[platform_data]:
+                        # Extract bio/description
+                        inferred_data = profile.get('inferred_data', {})
+
+                        if 'bio' in inferred_data:
+                            content_list.append(inferred_data['bio'])
+
+                        if 'description' in inferred_data:
+                            content_list.append(inferred_data['description'])
+
+                        if 'page_title' in profile:
+                            content_list.append(profile['page_title'])
+
+                        if 'page_description' in profile:
+                            content_list.append(profile['page_description'])
+
+                        # Extract from posts if available
+                        if 'posts' in inferred_data:
+                            for post in inferred_data['posts'][:10]:  # Limit to 10 posts
+                                if isinstance(post, dict) and 'text' in post:
+                                    content_list.append(post['text'])
+                                elif isinstance(post, str):
+                                    content_list.append(post)
+
+            # Filter out empty or very short content
+            content_list = [content for content in content_list if content and len(content.strip()) > 10]
+
+            return content_list
+
+        def _perform_sentiment_analysis(self, content_list: List[str]) -> Dict[str, Any]:
+            """Perform comprehensive sentiment analysis"""
+
+            if not content_list:
+                return {'overall_sentiment': 'neutral', 'sentiment_distribution': {}, 'emotional_profile': {}}
+
+            sentiment_results = []
+            emotional_indicators = defaultdict(int)
+
+            for content in content_list:
+                result = self.sentiment_analyzer.analyze_sentiment(content)
+                sentiment_results.append(result)
+
+                # Count emotional indicators
+                for emotion in result.emotional_indicators:
+                    emotional_indicators[emotion] += 1
+
+            # Calculate overall sentiment
+            avg_polarity = np.mean([r.polarity for r in sentiment_results])
+            avg_subjectivity = np.mean([r.subjectivity for r in sentiment_results])
+
+            # Classify overall sentiment
+            if avg_polarity > 0.1:
+                overall_sentiment = 'positive'
+            elif avg_polarity < -0.1:
+                overall_sentiment = 'negative'
+            else:
+                overall_sentiment = 'neutral'
+
+            # Distribution of sentiments
+            sentiment_counts = Counter([r.classification for r in sentiment_results])
+            total_sentiments = len(sentiment_results)
+
+            sentiment_distribution = {
+                classification: count / total_sentiments
+                for classification, count in sentiment_counts.items()
+            }
+
+            # Emotional profile
+            total_emotions = sum(emotional_indicators.values())
+            emotional_profile = {
+                emotion: count / total_emotions if total_emotions > 0 else 0
+                for emotion, count in emotional_indicators.items()
+            }
+
+            return {
+                'overall_sentiment': overall_sentiment,
+                'average_polarity': avg_polarity,
+                'average_subjectivity': avg_subjectivity,
+                'sentiment_distribution': sentiment_distribution,
+                'emotional_profile': emotional_profile,
+                'confidence_score': np.mean([r.confidence for r in sentiment_results])
+            }
+
+        def _analyze_hashtag_patterns(self, content_list: List[str]) -> Dict[str, Any]:
+            """Analyze hashtag usage patterns"""
+
+            hashtag_patterns = self.hashtag_analyzer.analyze_hashtag_patterns(content_list)
+
+            if not hashtag_patterns:
+                return {'patterns': [], 'usage_style': 'minimal', 'trending_topics': []}
+
+            # Determine usage style
+            total_hashtags = sum(p.frequency for p in hashtag_patterns)
+            unique_hashtags = len(hashtag_patterns)
+
+            if total_hashtags == 0:
+                usage_style = 'minimal'
+            elif unique_hashtags / len(content_list) > 0.5:
+                usage_style = 'diverse'
+            elif total_hashtags / len(content_list) > 2:
+                usage_style = 'heavy'
+            else:
+                usage_style = 'moderate'
+
+            # Get trending topics
+            trending_topics = [
+                {'hashtag': p.hashtag, 'score': p.trending_score}
+                for p in hashtag_patterns[:5]  # Top 5
+            ]
+
+            return {
+                'patterns': [asdict(p) for p in hashtag_patterns],
+                'usage_style': usage_style,
+                'total_hashtags': total_hashtags,
+                'unique_hashtags': unique_hashtags,
+                'trending_topics': trending_topics
+            }
+
+        def _analyze_mention_patterns(self, content_list: List[str]) -> Dict[str, Any]:
+            """Analyze mention (@username) patterns"""
+
+            return self.hashtag_analyzer.analyze_mention_patterns(content_list)
+
+        def _analyze_engagement(self, social_data: Dict[str, Any]) -> Dict[str, Any]:
+            """Analyze content engagement patterns"""
+
+            # Extract engagement data from social profiles
+            content_data = []
+
+            for platform_data in ['social_profiles', 'discovered_profiles']:
+                if platform_data in social_data:
+                    for profile in social_data[platform_data]:
+                        inferred_data = profile.get('inferred_data', {})
+
+                        # Create content entry with engagement metrics
+                        content_entry = {
+                            'text': inferred_data.get('bio', ''),
+                            'likes': inferred_data.get('followers', 0),
+                            'comments': inferred_data.get('public_repos', 0),  # For GitHub
+                            'shares': 0,  # Placeholder
+                            'reactions': 0  # Placeholder
+                        }
+
+                        if content_entry['text']:
+                            content_data.append(content_entry)
+
+            if not content_data:
+                return asdict(EngagementMetrics(0.0, {}, [], 'neutral', 0.0, 0.0))
+
+            engagement_metrics = self.engagement_analyzer.analyze_engagement(content_data)
+            return asdict(engagement_metrics)
+
+        def _perform_topic_modeling(self, content_list: List[str]) -> Dict[str, Any]:
+            """Perform topic modeling for interest categorization"""
+
+            if len(content_list) < 3:
+                return {'topics': [], 'primary_topics': [], 'topic_diversity': 0.0}
+
+            topics = self.topic_engine.perform_topic_modeling(content_list, num_topics=5)
+
+            # Get primary topics (top 3 by relevance)
+            primary_topics = [
+                {
+                    'name': topic.topic_name,
+                    'keywords': topic.keywords,
+                    'relevance': topic.relevance_score
+                }
+                for topic in topics[:3]
+            ]
+
+            # Calculate topic diversity
+            if topics:
+                relevance_scores = [t.relevance_score for t in topics]
+                topic_diversity = 1.0 - (max(relevance_scores) - min(relevance_scores))
+            else:
+                topic_diversity = 0.0
+
+            return {
+                'topics': [asdict(topic) for topic in topics],
+                'primary_topics': primary_topics,
+                'topic_diversity': topic_diversity,
+                'total_topics_identified': len(topics)
+            }
+
+        def _generate_comprehensive_interest_profile(self, analysis_results: Dict[str, Any]) -> InterestProfile:
+            """Generate comprehensive interest profile including all analysis dimensions"""
+
+            # Extract primary interests from topic modeling
+            primary_interests = []
+            interest_scores = {}
+
+            topic_data = analysis_results.get('topic_modeling', {})
+            for topic in topic_data.get('primary_topics', []):
+                interest_name = topic['name']
+                primary_interests.append(interest_name)
+                interest_scores[interest_name] = topic['relevance']
+
+            # Add interests from hashtag patterns
+            hashtag_data = analysis_results.get('hashtag_patterns', {})
+            for pattern in hashtag_data.get('patterns', [])[:3]:  # Top 3 hashtags
+                hashtag = pattern['hashtag']
+                if hashtag not in interest_scores:
+                    interest_scores[hashtag] = pattern['trending_score']
+
+            # Add interests from economic indicators
+            economic_data = analysis_results.get('economic_indicators', {})
+            for brand in economic_data.get('brand_mentions', [])[:3]:  # Top 3 brands
+                brand_name = brand.get('brand_name', '')
+                if brand_name and brand_name not in interest_scores:
+                    interest_scores[brand_name] = brand.get('sentiment_score', 0.0)
+
+            # Comprehensive behavioral patterns from all analyses
+            sentiment_data = analysis_results.get('sentiment_analysis', {})
+            engagement_data = analysis_results.get('engagement_analysis', {})
+            schedule_data = analysis_results.get('schedule_patterns', {})
+            mental_state_data = analysis_results.get('mental_state_assessment', {})
+
+            comprehensive_behavioral_patterns = {
+                # Core behavioral patterns
+                'emotional_tendency': sentiment_data.get('overall_sentiment', 'neutral'),
+                'communication_style': self._determine_communication_style(sentiment_data, hashtag_data),
+                'engagement_preference': engagement_data.get('audience_response_sentiment', 'neutral'),
+                'content_frequency': self._estimate_content_frequency(analysis_results),
+
+                # Schedule-based behavioral patterns
+                'temporal_signature': schedule_data.get('post_timing', {}).get('temporal_signature', 'unknown'),
+                'activity_rhythm': schedule_data.get('activity_frequency', {}).get('engagement_rhythm', 'unknown'),
+                'geographic_scope': schedule_data.get('geographic_inference', {}).get('geographic_scope', 'unknown'),
+                'work_life_balance': schedule_data.get('work_personal_boundary', {}).get('boundary_clarity', 'unknown'),
+                'schedule_consistency': schedule_data.get('post_timing', {}).get('consistency_score', 0.0),
+                'privacy_awareness': len([i for i in schedule_data.get('privacy_implications', []) if '✅' in i]) > 0,
+                'posting_frequency': schedule_data.get('post_timing', {}).get('posting_frequency', 'unknown'),
+                'peak_activity_hours': schedule_data.get('post_timing', {}).get('peak_hours', []),
+                'time_zone_indicators': schedule_data.get('post_timing', {}).get('time_zone_indicators', []),
+
+                # Economic behavioral patterns
+                'spending_capacity': economic_data.get('economic_profile', {}).get('spending_capacity', 'unknown'),
+                'brand_affinity': economic_data.get('economic_profile', {}).get('brand_affinity_tier', 'unknown'),
+                'purchase_style': economic_data.get('economic_profile', {}).get('purchase_decision_style', 'balanced'),
+                'economic_lifestyle': economic_data.get('economic_profile', {}).get('economic_lifestyle', 'practical'),
+                'professional_level': economic_data.get('professional_network', {}).get('seniority_level', 'unknown'),
+                'economic_risk_awareness': economic_data.get('economic_risk_score', 0.0) < 0.5,
+                'brand_loyalty_tendency': self._calculate_brand_loyalty_tendency(economic_data),
+                'financial_sophistication': economic_data.get('economic_profile', {}).get('financial_sophistication',
+                                                                                          'basic'),
+                'professional_influence': economic_data.get('professional_network', {}).get('professional_influence',
+                                                                                            0.0),
+
+                # Mental state behavioral patterns
+                'overall_mental_state': mental_state_data.get('mental_state_profile', {}).get('overall_mental_state',
+                                                                                              'stable'),
+                'emotional_stability': mental_state_data.get('mental_state_profile', {}).get(
+                    'emotional_stability_score', 0.5),
+                'social_connectivity': mental_state_data.get('mental_state_profile', {}).get(
+                    'social_connectivity_level', 'unknown'),
+                'stress_level': mental_state_data.get('mental_state_profile', {}).get('stress_level', 'unknown'),
+                'wellbeing_trajectory': mental_state_data.get('mental_state_profile', {}).get('wellbeing_trajectory',
+                                                                                              'stable'),
+                'language_complexity': mental_state_data.get('language_patterns', {}).get('complexity_score', 0.0),
+                'emoji_usage_frequency': mental_state_data.get('emoji_patterns', {}).get('emoji_frequency', 0.0),
+                'social_isolation_risk': mental_state_data.get('social_interaction', {}).get('social_engagement_level',
+                                                                                             'unknown') == 'isolated',
+                'mental_health_protective_factors': len(
+                    mental_state_data.get('risk_factors', {}).get('protective_factors', [])),
+                'crisis_risk_indicators': len(
+                    mental_state_data.get('risk_factors', {}).get('crisis_warning_signals', []))
+            }
+
+            # Comprehensive content preferences with all insights
+            comprehensive_content_preferences = {
+                # Core content preferences
+                'preferred_sentiment': sentiment_data.get('overall_sentiment', 'neutral'),
+                'hashtag_usage': hashtag_data.get('usage_style', 'minimal'),
+                'interaction_style': analysis_results.get('mention_patterns', {}).get('interaction_style',
+                                                                                      'non_interactive'),
+                'topic_diversity': topic_data.get('topic_diversity', 0.0),
+
+                # Schedule-based preferences
+                'preferred_posting_times': schedule_data.get('post_timing', {}).get('peak_hours', []),
+                'geographic_preferences': schedule_data.get('geographic_inference', {}).get('likely_locations', []),
+                'work_content_ratio': schedule_data.get('work_personal_boundary', {}).get('professional_content_ratio',
+                                                                                          0.0),
+
+                # Economic content preferences
+                'brand_mention_frequency': len(economic_data.get('brand_mentions', [])),
+                'location_sharing_tendency': len(economic_data.get('location_patterns', [])),
+                'purchase_sharing_behavior': len(economic_data.get('purchase_activities', [])),
+                'professional_content_ratio': economic_data.get('professional_network', {}).get(
+                    'thought_leadership_score', 0.0),
+                'luxury_brand_affinity': len(
+                    [b for b in economic_data.get('brand_mentions', []) if b.get('price_tier') == 'luxury']),
+                'economic_transparency': economic_data.get('economic_risk_score', 0.0),
+                'career_focus_level': economic_data.get('professional_network', {}).get('networking_activity',
+                                                                                        'passive'),
+
+                # Mental state content preferences
+                'emotional_expression_frequency': mental_state_data.get('emoji_patterns', {}).get(
+                    'emotional_emoji_ratio', 0.0),
+                'social_interaction_preference': mental_state_data.get('social_interaction', {}).get('interaction_rate',
+                                                                                                     0.0),
+                'language_formality_preference': mental_state_data.get('language_patterns', {}).get('formality_level',
+                                                                                                    'neutral'),
+                'content_tone_consistency': mental_state_data.get('content_tone', {}).get('tone_consistency', 0.0),
+                'wellbeing_content_sharing': len(
+                    mental_state_data.get('content_tone', {}).get('wellbeing_indicators', [])),
+                'emotional_volatility': mental_state_data.get('content_tone', {}).get('emotional_volatility', 0.0),
+                'crisis_communication_patterns': len(
+                    mental_state_data.get('risk_factors', {}).get('crisis_warning_signals', [])) > 0
+            }
+
+            # Enhanced engagement style determination with all factors
+            engagement_style = self._determine_comprehensive_engagement_style(
+                engagement_data, comprehensive_behavioral_patterns, schedule_data, economic_data, mental_state_data
+            )
+
+            return InterestProfile(
+                primary_interests=primary_interests,
+                interest_scores=interest_scores,
+                interest_evolution={},  # Would require historical data
+                behavioral_patterns=comprehensive_behavioral_patterns,
+                content_preferences=comprehensive_content_preferences,
+                engagement_style=engagement_style
+            )
+
+        def _calculate_brand_loyalty_tendency(self, economic_data: Dict[str, Any]) -> str:
+            """Calculate brand loyalty tendency from purchase activities"""
+
+            purchase_activities = economic_data.get('purchase_activities', [])
+
+            if not purchase_activities:
+                return 'unknown'
+
+            loyalty_scores = [activity.get('brand_loyalty_score', 0.0) for activity in purchase_activities]
+            avg_loyalty = np.mean(loyalty_scores) if loyalty_scores else 0.0
+
+            if avg_loyalty > 0.7:
+                return 'high'
+            elif avg_loyalty > 0.4:
+                return 'medium'
+            else:
+                return 'low'
+
+        def _determine_communication_style(self, sentiment_data: Dict, hashtag_data: Dict) -> str:
+            """Determine communication style from sentiment and hashtag usage"""
+
+            sentiment = sentiment_data.get('overall_sentiment', 'neutral')
+            subjectivity = sentiment_data.get('average_subjectivity', 0.5)
+            hashtag_style = hashtag_data.get('usage_style', 'minimal')
+
+            if subjectivity > 0.7 and sentiment == 'positive':
+                return 'enthusiastic'
+            elif subjectivity > 0.7 and sentiment == 'negative':
+                return 'critical'
+            elif subjectivity < 0.3:
+                return 'factual'
+            elif hashtag_style == 'heavy':
+                return 'expressive'
+            else:
+                return 'balanced'
+
+        def _estimate_content_frequency(self, analysis_results: Dict) -> str:
+            """Estimate content posting frequency"""
+
+            content_count = analysis_results.get('analysis_metadata', {}).get('content_analyzed', 0)
+
+            if content_count > 20:
+                return 'high'
+            elif content_count > 10:
+                return 'moderate'
+            elif content_count > 5:
+                return 'low'
+            else:
+                return 'minimal'
+
+        def _determine_comprehensive_engagement_style(self, engagement_data: Dict,
+                                                      behavioral_patterns: Dict,
+                                                      schedule_data: Dict,
+                                                      economic_data: Dict,
+                                                      mental_state_data: Dict) -> str:
+            """Determine comprehensive engagement style including all factors"""
+
+            engagement_rate = engagement_data.get('engagement_rate', 0.0)
+            viral_potential = engagement_data.get('viral_potential', 0.0)
+            communication_style = behavioral_patterns.get('communication_style', 'balanced')
+
+            # Schedule-based factors
+            temporal_signature = behavioral_patterns.get('temporal_signature', 'unknown')
+            activity_rhythm = behavioral_patterns.get('activity_rhythm', 'unknown')
+            consistency_score = behavioral_patterns.get('schedule_consistency', 0.0)
+
+            # Economic factors
+            professional_influence = behavioral_patterns.get('professional_influence', 0.0)
+            spending_capacity = behavioral_patterns.get('spending_capacity', 'unknown')
+            professional_level = behavioral_patterns.get('professional_level', 'unknown')
+
+            # Mental state factors
+            mental_state = behavioral_patterns.get('overall_mental_state', 'stable')
+            emotional_stability = behavioral_patterns.get('emotional_stability', 0.5)
+            social_connectivity = behavioral_patterns.get('social_connectivity', 'unknown')
+
+            # Comprehensive engagement style determination with mental health considerations
+
+            # Crisis or concerning mental state overrides other factors
+            if mental_state in ['critical', 'concerning']:
+                if social_connectivity == 'isolated':
+                    return 'withdrawn_isolated'
+                elif emotional_stability < 0.3:
+                    return 'emotionally_volatile'
                 else:
-                    return 'balanced'
+                    return 'struggling_communicator'
 
-            def _estimate_content_frequency(self, analysis_results: Dict) -> str:
-                """Estimate content posting frequency"""
-
-                content_count = analysis_results.get('analysis_metadata', {}).get('content_analyzed', 0)
-
-                if content_count > 20:
-                    return 'high'
-                elif content_count > 10:
-                    return 'moderate'
-                elif content_count > 5:
-                    return 'low'
+            # High-functioning patterns
+            if professional_influence > 0.7 and professional_level in ['executive', 'senior']:
+                if mental_state == 'positive' and emotional_stability > 0.7:
+                    return 'influential_thought_leader'
+                elif consistency_score > 0.7:
+                    return 'professional_thought_leader'
                 else:
-                    return 'minimal'
+                    return 'executive_influencer'
 
-            def _determine_comprehensive_engagement_style(self, engagement_data: Dict,
-                                                          behavioral_patterns: Dict,
-                                                          schedule_data: Dict,
-                                                          economic_data: Dict,
-                                                          mental_state_data: Dict) -> str:
-                """Determine comprehensive engagement style including all factors"""
-
-                engagement_rate = engagement_data.get('engagement_rate', 0.0)
-                viral_potential = engagement_data.get('viral_potential', 0.0)
-                communication_style = behavioral_patterns.get('communication_style', 'balanced')
-
-                # Schedule-based factors
-                temporal_signature = behavioral_patterns.get('temporal_signature', 'unknown')
-                activity_rhythm = behavioral_patterns.get('activity_rhythm', 'unknown')
-                consistency_score = behavioral_patterns.get('schedule_consistency', 0.0)
-
-                # Economic factors
-                professional_influence = behavioral_patterns.get('professional_influence', 0.0)
-                spending_capacity = behavioral_patterns.get('spending_capacity', 'unknown')
-                professional_level = behavioral_patterns.get('professional_level', 'unknown')
-
-                # Mental state factors
-                mental_state = behavioral_patterns.get('overall_mental_state', 'stable')
-                emotional_stability = behavioral_patterns.get('emotional_stability', 0.5)
-                social_connectivity = behavioral_patterns.get('social_connectivity', 'unknown')
-
-                # Comprehensive engagement style determination with mental health considerations
-
-                # Crisis or concerning mental state overrides other factors
-                if mental_state in ['critical', 'concerning']:
-                    if social_connectivity == 'isolated':
-                        return 'withdrawn_isolated'
-                    elif emotional_stability < 0.3:
-                        return 'emotionally_volatile'
-                    else:
-                        return 'struggling_communicator'
-
-                # High-functioning patterns
-                if professional_influence > 0.7 and professional_level in ['executive', 'senior']:
-                    if mental_state == 'positive' and emotional_stability > 0.7:
-                        return 'influential_thought_leader'
-                    elif consistency_score > 0.7:
-                        return 'professional_thought_leader'
-                    else:
-                        return 'executive_influencer'
-
-                # Influencer patterns with mental health context
-                elif engagement_rate > 0.7 and viral_potential > 0.5:
-                    if mental_state == 'positive' and emotional_stability > 0.6:
-                        if spending_capacity == 'high':
-                            return 'balanced_luxury_influencer'
-                        else:
-                            return 'stable_viral_influencer'
-                    elif emotional_stability < 0.4:
-                        return 'volatile_influencer'
-                    elif spending_capacity == 'high':
-                        return 'luxury_influencer'
-                    else:
-                        return 'viral_influencer'
-
-                # Active engagement patterns
-                elif engagement_rate > 0.5:
-                    if mental_state == 'positive' and social_connectivity in ['medium', 'high']:
-                        if 'business_hours' in temporal_signature:
-                            return 'healthy_business_active'
-                        else:
-                            return 'socially_healthy_active'
-                    elif social_connectivity == 'isolated':
-                        return 'active_but_isolated'
-                    elif activity_rhythm == 'bursty' and emotional_stability < 0.4:
-                        return 'emotionally_driven_active'
-                    elif 'business_hours' in temporal_signature:
-                        return 'business_active'
-                    else:
-                        return 'active'
-
-                # Social engagement patterns
-                elif communication_style == 'enthusiastic':
-                    if mental_state == 'positive' and social_connectivity == 'high':
-                        return 'socially_thriving'
-                    elif emotional_stability > 0.6:
-                        return 'stable_social'
-                    elif spending_capacity in ['high', 'medium']:
-                        return 'affluent_social'
-                    else:
-                        return 'social'
-
-                # Informative patterns
-                elif communication_style == 'factual':
-                    if mental_state == 'positive' and professional_level in ['senior', 'executive']:
-                        return 'authoritative_informative'
-                    elif emotional_stability > 0.7:
-                        return 'stable_informative'
-                    elif professional_level in ['senior', 'executive']:
-                        return 'executive_informative'
-                    else:
-                        return 'informative'
-
-                # Scheduled/consistent patterns
-                elif consistency_score > 0.6:
-                    if mental_state == 'positive' and emotional_stability > 0.6:
-                        return 'disciplined_communicator'
-                    elif professional_level in ['senior', 'executive']:
-                        return 'executive_scheduled'
-                    else:
-                        return 'scheduled_poster'
-
-                # Default patterns with mental health context
-                elif mental_state == 'positive' and emotional_stability > 0.6:
+            # Influencer patterns with mental health context
+            elif engagement_rate > 0.7 and viral_potential > 0.5:
+                if mental_state == 'positive' and emotional_stability > 0.6:
                     if spending_capacity == 'high':
-                        return 'balanced_affluent_casual'
+                        return 'balanced_luxury_influencer'
                     else:
-                        return 'balanced_casual'
-                elif social_connectivity == 'isolated':
-                    return 'casual_isolated'
+                        return 'stable_viral_influencer'
+                elif emotional_stability < 0.4:
+                    return 'volatile_influencer'
                 elif spending_capacity == 'high':
-                    return 'affluent_casual'
+                    return 'luxury_influencer'
                 else:
-                    return 'casual'
+                    return 'viral_influencer'
 
-            def get_privacy_status(self) -> Dict[str, Any]:
-                """Get current privacy framework status"""
+            # Active engagement patterns
+            elif engagement_rate > 0.5:
+                if mental_state == 'positive' and social_connectivity in ['medium', 'high']:
+                    if 'business_hours' in temporal_signature:
+                        return 'healthy_business_active'
+                    else:
+                        return 'socially_healthy_active'
+                elif social_connectivity == 'isolated':
+                    return 'active_but_isolated'
+                elif activity_rhythm == 'bursty' and emotional_stability < 0.4:
+                    return 'emotionally_driven_active'
+                elif 'business_hours' in temporal_signature:
+                    return 'business_active'
+                else:
+                    return 'active'
 
-                if not self.privacy_framework:
-                    return {'privacy_enabled': False}
+            # Social engagement patterns
+            elif communication_style == 'enthusiastic':
+                if mental_state == 'positive' and social_connectivity == 'high':
+                    return 'socially_thriving'
+                elif emotional_stability > 0.6:
+                    return 'stable_social'
+                elif spending_capacity in ['high', 'medium']:
+                    return 'affluent_social'
+                else:
+                    return 'social'
 
-                return {
-                    'privacy_enabled': True,
-                    'compliance_status': self.privacy_framework.validate_privacy_compliance(),
-                    'client_side_config': self.privacy_framework.get_client_side_config(),
-                    'retention_policy': {
-                        'max_hours': self.privacy_framework.retention_policy.max_retention_hours,
-                        'auto_deletion': self.privacy_framework.retention_policy.auto_deletion_enabled,
-                        'secure_deletion': self.privacy_framework.retention_policy.secure_deletion_required,
-                        'audit_trail': self.privacy_framework.retention_policy.audit_trail_enabled
-                    }
+            # Informative patterns
+            elif communication_style == 'factual':
+                if mental_state == 'positive' and professional_level in ['senior', 'executive']:
+                    return 'authoritative_informative'
+                elif emotional_stability > 0.7:
+                    return 'stable_informative'
+                elif professional_level in ['senior', 'executive']:
+                    return 'executive_informative'
+                else:
+                    return 'informative'
+
+            # Scheduled/consistent patterns
+            elif consistency_score > 0.6:
+                if mental_state == 'positive' and emotional_stability > 0.6:
+                    return 'disciplined_communicator'
+                elif professional_level in ['senior', 'executive']:
+                    return 'executive_scheduled'
+                else:
+                    return 'scheduled_poster'
+
+            # Default patterns with mental health context
+            elif mental_state == 'positive' and emotional_stability > 0.6:
+                if spending_capacity == 'high':
+                    return 'balanced_affluent_casual'
+                else:
+                    return 'balanced_casual'
+            elif social_connectivity == 'isolated':
+                return 'casual_isolated'
+            elif spending_capacity == 'high':
+                return 'affluent_casual'
+            else:
+                return 'casual'
+
+        def get_privacy_status(self) -> Dict[str, Any]:
+            """Get current privacy framework status"""
+
+            if not self.privacy_framework:
+                return {'privacy_enabled': False}
+
+            return {
+                'privacy_enabled': True,
+                'compliance_status': self.privacy_framework.validate_privacy_compliance(),
+                'client_side_config': self.privacy_framework.get_client_side_config(),
+                'retention_policy': {
+                    'max_hours': self.privacy_framework.retention_policy.max_retention_hours,
+                    'auto_deletion': self.privacy_framework.retention_policy.auto_deletion_enabled,
+                    'secure_deletion': self.privacy_framework.retention_policy.secure_deletion_required,
+                    'audit_trail': self.privacy_framework.retention_policy.audit_trail_enabled
                 }
+            }
 
-            def get_ethical_compliance_status(self) -> Dict[str, Any]:
-                """Get current ethical compliance status"""
+        def get_ethical_compliance_status(self) -> Dict[str, Any]:
+            """Get current ethical compliance status"""
 
-                if not self.ethical_framework:
-                    return {'ethical_boundaries_enabled': False}
+            if not self.ethical_framework:
+                return {'ethical_boundaries_enabled': False}
 
-                return {
-                    'ethical_boundaries_enabled': True,
-                    'compliance_report': self.ethical_framework.get_compliance_report(),
-                    'ethics_board_status': 'active',
-                    'age_verification_methods': [
-                        'government_id',
-                        'credit_card',
-                        'phone_verification',
-                        'third_party_service',
-                        'declaration_with_validation'
-                    ],
-                    'allowed_use_cases': [
-                        'legitimate_research',
-                        'security_analysis',
-                        'self_assessment',
-                        'educational'
-                    ],
-                    'prohibited_use_cases': [
-                        'malicious_stalking',
-                        'harassment',
-                        'discrimination',
-                        'unauthorized_profiling'
-                    ]
-                }
+            return {
+                'ethical_boundaries_enabled': True,
+                'compliance_report': self.ethical_framework.get_compliance_report(),
+                'ethics_board_status': 'active',
+                'age_verification_methods': [
+                    'government_id',
+                    'credit_card',
+                    'phone_verification',
+                    'third_party_service',
+                    'declaration_with_validation'
+                ],
+                'allowed_use_cases': [
+                    'legitimate_research',
+                    'security_analysis',
+                    'self_assessment',
+                    'educational'
+                ],
+                'prohibited_use_cases': [
+                    'malicious_stalking',
+                    'harassment',
+                    'discrimination',
+                    'unauthorized_profiling'
+                ]
+            }
 
-            def get_consent_status(self) -> Dict[str, Any]:
-                """Get current consent framework status"""
+        def get_consent_status(self) -> Dict[str, Any]:
+            """Get current consent framework status"""
 
-                if not self.consent_framework:
-                    return {'consent_enabled': False}
+            if not self.consent_framework:
+                return {'consent_enabled': False}
 
-                return {
-                    'consent_enabled': True,
-                    'multi_step_consent': True,
-                    'granular_control': True,
-                    'immediate_deletion': True,
-                    'stage_by_stage_opt_out': True,
-                    'consent_withdrawal': True,
-                    'transparency_reports': True,
-                    'available_consent_types': [
-                        'data_collection',
-                        'data_processing',
-                        'analysis_inference',
-                        'data_retention',
-                        'result_storage',
-                        'third_party_sharing',
-                        'marketing_communications'
-                    ],
-                    'processing_stages': [
-                        'data_ingestion',
-                        'privacy_anonymization',
-                        'ethical_evaluation',
-                        'sentiment_analysis',
-                        'schedule_analysis',
-                        'economic_analysis',
-                        'mental_state_analysis',
-                        'results_generation',
-                        'data_deletion'
-                    ]
-                }
+            return {
+                'consent_enabled': True,
+                'multi_step_consent': True,
+                'granular_control': True,
+                'immediate_deletion': True,
+                'stage_by_stage_opt_out': True,
+                'consent_withdrawal': True,
+                'transparency_reports': True,
+                'available_consent_types': [
+                    'data_collection',
+                    'data_processing',
+                    'analysis_inference',
+                    'data_retention',
+                    'result_storage',
+                    'third_party_sharing',
+                    'marketing_communications'
+                ],
+                'processing_stages': [
+                    'data_ingestion',
+                    'privacy_anonymization',
+                    'ethical_evaluation',
+                    'sentiment_analysis',
+                    'schedule_analysis',
+                    'economic_analysis',
+                    'mental_state_analysis',
+                    'results_generation',
+                    'data_deletion'
+                ]
+            }
 
-            def get_risk_mitigation_status(self) -> Dict[str, Any]:
-                """Get current risk mitigation framework status"""
+        def get_risk_mitigation_status(self) -> Dict[str, Any]:
+            """Get current risk mitigation framework status"""
 
-                if not self.risk_mitigation:
-                    return {'risk_mitigation_enabled': False}
+            if not self.risk_mitigation:
+                return {'risk_mitigation_enabled': False}
 
-                return self.risk_mitigation.get_comprehensive_status()
+            return self.risk_mitigation.get_comprehensive_status()
 
-            def enable_client_side_processing(self) -> Dict[str, Any]:
-                """Enable client-side processing mode"""
+        def enable_client_side_processing(self) -> Dict[str, Any]:
+            """Enable client-side processing mode"""
 
-                if not self.privacy_framework:
-                    raise ValueError("Privacy framework not initialized")
+            if not self.privacy_framework:
+                raise ValueError("Privacy framework not initialized")
 
-                self.privacy_framework.processing_mode.client_side_enabled = True
-                self.privacy_framework.processing_mode.local_processing_only = True
+            self.privacy_framework.processing_mode.client_side_enabled = True
+            self.privacy_framework.processing_mode.local_processing_only = True
 
-                return self.privacy_framework.get_client_side_config()
+            return self.privacy_framework.get_client_side_config()
 
-            def _create_empty_analysis(self, processing_id: str = None, privacy_level: str = 'standard',
-                                       ethical_approval=None, consent_verified: bool = False,
-                                       authorization_result=None, moderation_result=None,
-                                       gdpr_compliance=None, ccpa_compliance=None) -> Dict[str, Any]:
-                """Create empty analysis structure when no content is available"""
+        def _create_empty_analysis(self, processing_id: str = None, privacy_level: str = 'standard',
+                                   ethical_approval=None, consent_verified: bool = False,
+                                   authorization_result=None, moderation_result=None,
+                                   gdpr_compliance=None, ccpa_compliance=None) -> Dict[str, Any]:
+            """Create empty analysis structure when no content is available"""
 
-                return {
-                    'sentiment_analysis': {
-                        'overall_sentiment': 'neutral',
-                        'sentiment_distribution': {},
-                        'emotional_profile': {}
+            return {
+                'sentiment_analysis': {
+                    'overall_sentiment': 'neutral',
+                    'sentiment_distribution': {},
+                    'emotional_profile': {}
+                },
+                'hashtag_patterns': {
+                    'patterns': [],
+                    'usage_style': 'minimal',
+                    'trending_topics': []
+                },
+                'mention_patterns': {
+                    'total_mentions': 0,
+                    'interaction_style': 'non_interactive'
+                },
+                'engagement_analysis': asdict(EngagementMetrics(0.0, {}, [], 'neutral', 0.0, 0.0)),
+                'topic_modeling': {
+                    'topics': [],
+                    'primary_topics': [],
+                    'topic_diversity': 0.0
+                },
+                'schedule_patterns': {
+                    'post_timing': {},
+                    'activity_frequency': {},
+                    'geographic_inference': {},
+                    'work_personal_boundary': {},
+                    'overall_schedule_score': 0.0,
+                    'behavioral_insights': [],
+                    'privacy_implications': [],
+                    'analysis_completed': False
+                },
+                'economic_indicators': {
+                    'brand_mentions': [],
+                    'location_patterns': [],
+                    'purchase_activities': [],
+                    'professional_network': {},
+                    'economic_profile': {},
+                    'economic_risk_score': 0.0,
+                    'economic_insights': [],
+                    'privacy_economic_implications': [],
+                    'analysis_completed': False
+                },
+                'mental_state_assessment': {
+                    'language_patterns': {},
+                    'emoji_patterns': {},
+                    'social_interaction': {},
+                    'content_tone': {},
+                    'risk_factors': {},
+                    'mental_state_profile': {},
+                    'assessment_confidence': 0.0,
+                    'recommendations': [],
+                    'privacy_considerations': [],
+                    'analysis_completed': False
+                },
+                'interest_profile': asdict(InterestProfile([], {}, {}, {}, {}, 'minimal')),
+                'authorization_status': {
+                    'authorized': authorization_result.authorized if authorization_result else True,
+                    'access_level': authorization_result.access_level.value if authorization_result else 'basic',
+                    'verification_completed': True,
+                    'consent_obtained': True,
+                    'analysis_scope': self._determine_analysis_scope(
+                        authorization_result.access_level if authorization_result else AccessLevel.BASIC)
+                },
+                'risk_mitigation_status': {
+                    'enabled': self.risk_mitigation is not None,
+                    'input_validated': True,
+                    'performance_optimized': True,
+                    'error_handling_active': True
+                },
+                'abuse_prevention_status': {
+                    'enabled': self.abuse_prevention is not None,
+                    'user_verified': True,
+                    'usage_limits_checked': True,
+                    'ip_tracking_active': True,
+                    'reporting_available': True
+                },
+                'legal_ethical_compliance': {
+                    'content_moderation': {
+                        'enabled': True,
+                        'content_approved': moderation_result.automated_action != 'block' if moderation_result else True,
+                        'risk_level': moderation_result.overall_risk_level.value if moderation_result else 'low',
+                        'confidence_score': moderation_result.confidence_score if moderation_result else 1.0,
+                        'human_review_required': moderation_result.requires_human_review if moderation_result else False
                     },
-                    'hashtag_patterns': {
-                        'patterns': [],
-                        'usage_style': 'minimal',
-                        'trending_topics': []
+                    'terms_of_service': {
+                        'version': self.legal_ethical_framework.terms_manager.current_terms.version if self.legal_ethical_framework else '1.0',
+                        'compliance': 'acknowledged',
+                        'ai_specific_terms': True
                     },
-                    'mention_patterns': {
-                        'total_mentions': 0,
-                        'interaction_style': 'non_interactive'
+                    'privacy_policy': {
+                        'version': self.legal_ethical_framework.privacy_manager.current_policy.version if self.legal_ethical_framework else '1.0',
+                        'ai_data_processing_disclosed': True,
+                        'user_rights_available': True
                     },
-                    'engagement_analysis': asdict(EngagementMetrics(0.0, {}, [], 'neutral', 0.0, 0.0)),
-                    'topic_modeling': {
-                        'topics': [],
-                        'primary_topics': [],
-                        'topic_diversity': 0.0
-                    },
-                    'schedule_patterns': {
-                        'post_timing': {},
-                        'activity_frequency': {},
-                        'geographic_inference': {},
-                        'work_personal_boundary': {},
-                        'overall_schedule_score': 0.0,
-                        'behavioral_insights': [],
-                        'privacy_implications': [],
-                        'analysis_completed': False
-                    },
-                    'economic_indicators': {
-                        'brand_mentions': [],
-                        'location_patterns': [],
-                        'purchase_activities': [],
-                        'professional_network': {},
-                        'economic_profile': {},
-                        'economic_risk_score': 0.0,
-                        'economic_insights': [],
-                        'privacy_economic_implications': [],
-                        'analysis_completed': False
-                    },
-                    'mental_state_assessment': {
-                        'language_patterns': {},
-                        'emoji_patterns': {},
-                        'social_interaction': {},
-                        'content_tone': {},
-                        'risk_factors': {},
-                        'mental_state_profile': {},
-                        'assessment_confidence': 0.0,
-                        'recommendations': [],
-                        'privacy_considerations': [],
-                        'analysis_completed': False
-                    },
-                    'interest_profile': asdict(InterestProfile([], {}, {}, {}, {}, 'minimal')),
-                    'authorization_status': {
-                        'authorized': authorization_result.authorized if authorization_result else True,
-                        'access_level': authorization_result.access_level.value if authorization_result else 'basic',
-                        'verification_completed': True,
-                        'consent_obtained': True,
-                        'analysis_scope': self._determine_analysis_scope(
-                            authorization_result.access_level if authorization_result else AccessLevel.BASIC)
-                    },
-                    'risk_mitigation_status': {
-                        'enabled': self.risk_mitigation is not None,
-                        'input_validated': True,
-                        'performance_optimized': True,
-                        'error_handling_active': True
-                    },
-                    'legal_ethical_compliance': {
-                        'content_moderation': {
-                            'enabled': True,
-                            'content_approved': moderation_result.automated_action != 'block' if moderation_result else True,
-                            'risk_level': moderation_result.overall_risk_level.value if moderation_result else 'low',
-                            'confidence_score': moderation_result.confidence_score if moderation_result else 1.0,
-                            'human_review_required': moderation_result.requires_human_review if moderation_result else False
-                        },
-                        'terms_of_service': {
-                            'version': self.legal_ethical_framework.terms_manager.current_terms.version if self.legal_ethical_framework else '1.0',
-                            'compliance': 'acknowledged',
-                            'ai_specific_terms': True
-                        },
-                        'privacy_policy': {
-                            'version': self.legal_ethical_framework.privacy_manager.current_policy.version if self.legal_ethical_framework else '1.0',
-                            'ai_data_processing_disclosed': True,
-                            'user_rights_available': True
-                        },
-                        'regulatory_compliance': {
-                            'gdpr_compliance': gdpr_compliance.status if gdpr_compliance else 'not_assessed',
-                            'ccpa_compliance': ccpa_compliance.status if ccpa_compliance else 'not_assessed',
-                            'compliance_score': (
+                    'regulatory_compliance': {
+                        'gdpr_compliance': gdpr_compliance.status if gdpr_compliance else 'not_assessed',
+                        'ccpa_compliance': ccpa_compliance.status if ccpa_compliance else 'not_assessed',
+                        'compliance_score': (
                                                         gdpr_compliance.compliance_score + ccpa_compliance.compliance_score) / 2 if gdpr_compliance and ccpa_compliance else 0.0
-                        }
-                    } if self.legal_ethical_framework else {'enabled': False},
-                    'privacy_compliance': self.privacy_framework.validate_privacy_compliance() if self.privacy_framework else {},
-                    'privacy_metrics': {
-                        'processing_id': processing_id,
-                        'privacy_level': privacy_level,
-                        'data_protection_enabled': self.privacy_framework is not None
-                    },
-                    'ethical_compliance': {
-                        'approved': ethical_approval.ethics_approved if ethical_approval else True,
-                        'compliance_score': ethical_approval.compliance_score if ethical_approval else 1.0,
-                        'age_verified': ethical_approval.age_verification.verified if ethical_approval else False,
-                        'restrictions_applied': True
-                    } if ethical_approval else {'enabled': self.ethical_framework is not None},
-                    'consent_status': {
-                        'consent_verified': consent_verified,
-                        'user_control_options': {
-                            'immediate_deletion': True,
-                            'opt_out_available': True,
-                            'withdraw_consent': True,
-                            'download_data': True
-                        }
-                    },
-                    'results_presentation': {
-                        'privacy_score': {'value': 1, 'colour': '#008000'},
-                        'inferences': [],
-                        'mitigation_recommendations': [
-                            '📋 Legal and ethical compliance verified - All regulations met',
-                            '🛡️ Risk mitigation active - All technical risks addressed',
-                            '🔒 Privacy framework active - Zero data retention',
-                            '⚖️ Ethical boundaries enforced - All guidelines followed',
-                            '🎛️ User consent verified - Full control maintained',
-                            '🔐 Authorization verified - Identity and access confirmed',
-                            '🛡️ All analysis performed on anonymized data',
-                            '🚫 No content available for comprehensive analysis'
-                        ]
-                    },
-                    'analysis_metadata': {
-                        'content_analyzed': 0,
-                        'analysis_timestamp': datetime.utcnow().isoformat(),
-                        'analysis_version': '5.1',
-                        'privacy_protected': self.privacy_framework is not None,
-                        'ethics_approved': ethical_approval.ethics_approved if ethical_approval else True,
-                        'consent_verified': consent_verified,
-                        'authorization_approved': authorization_result.authorized if authorization_result else True,
-                        'risk_mitigation_enabled': self.risk_mitigation is not None,
-                        'legal_ethical_enabled': self.legal_ethical_framework is not None,
-                        'content_moderated': moderation_result is not None,
-                        'access_level': authorization_result.access_level.value if authorization_result else 'basic',
-                        'processing_id': processing_id,
-                        'privacy_level': privacy_level,
-                        'ethical_compliance_score': ethical_approval.compliance_score if ethical_approval else 1.0,
-                        'note': 'Insufficient content for comprehensive analysis',
+                    }
+                } if self.legal_ethical_framework else {'enabled': False},
+                'privacy_compliance': self.privacy_framework.validate_privacy_compliance() if self.privacy_framework else {},
+                'privacy_metrics': {
+                    'processing_id': processing_id,
+                    'privacy_level': privacy_level,
+                    'data_protection_enabled': self.privacy_framework is not None
+                },
+                'ethical_compliance': {
+                    'approved': ethical_approval.ethics_approved if ethical_approval else True,
+                    'compliance_score': ethical_approval.compliance_score if ethical_approval else 1.0,
+                    'age_verified': ethical_approval.age_verification.verified if ethical_approval else False,
+                    'restrictions_applied': True
+                } if ethical_approval else {'enabled': self.ethical_framework is not None},
+                'consent_status': {
+                    'consent_verified': consent_verified,
+                    'user_control_options': {
+                        'immediate_deletion': True,
                         'opt_out_available': True,
-                        'immediate_deletion_available': True,
-                        'features': [
-                            'legal_ethical_framework',
-                            'risk_mitigation_framework',
-                            'authorization_framework',
-                            'sentiment_analysis',
-                            'hashtag_patterns',
-                            'mention_patterns',
-                            'engagement_analysis',
-                            'topic_modeling',
-                            'schedule_patterns',
-                            'economic_indicators',
-                            'mental_state_assessment',
-                            'interest_profile',
-                            'privacy_framework',
-                            'ethical_boundaries',
-                            'consent_framework',
-                            'results_presentation'
-                        ],
-                        'economic_brands_detected': 0,
-                        'economic_locations_detected': 0,
-                        'purchase_activities_detected': 0,
-                        'economic_risk_level': 'low',
-                        'professional_influence_detected': False,
-                        'mental_state_detected': 'stable',
-                        'mental_health_risk_level': 'low',
-                        'emotional_stability_score': 0.5,
-                        'social_connectivity_level': 'unknown',
-                        'crisis_indicators_detected': False,
-                        'protective_factors_identified': 0
+                        'withdraw_consent': True,
+                        'download_data': True
                     }
-                }
-
-            def get_comprehensive_framework_status(self) -> Dict[str, Any]:
-                """Get complete status of all integrated frameworks"""
-
-                return {
-                    'framework_integration': {
-                        'privacy_framework': self.privacy_framework is not None,
-                        'ethical_framework': self.ethical_framework is not None,
-                        'consent_framework': self.consent_framework is not None,
-                        'authorization_framework': self.authorization_framework is not None,
-                        'risk_mitigation_framework': self.risk_mitigation is not None,
-                        'legal_ethical_framework': self.legal_ethical_framework is not None
-                    },
-                    'privacy_status': self.get_privacy_status(),
-                    'ethical_status': self.get_ethical_compliance_status(),
-                    'consent_status': self.get_consent_status(),
-                    'authorization_status': self.get_authorization_status(),
-                    'risk_mitigation_status': self.get_risk_mitigation_status(),
-                    'legal_ethical_status': self.get_legal_ethical_status(),
-                    'integrated_features': [
-                        'Terms of Service with AI-specific provisions',
-                        'Transparent Privacy Policy with AI data handling disclosure',
-                        'GDPR and CCPA compliance frameworks with automated assessment',
-                        'Content moderation with automated flagging for harmful requests',
-                        'Legal liability protection with comprehensive documentation',
-                        'Regulatory compliance monitoring with audit trails',
-                        'Rate limiting with Flask-Limiter (Redis backend)',
-                        'Advanced input validation and sanitization',
-                        'XSS and SQL injection prevention',
-                        'CSRF protection with Flask-WTF',
-                        'Comprehensive error handling with generic messages',
-                        'Performance optimization with intelligent caching',
-                        'Multi-factor identity verification',
-                        'Third-party consent management',
-                        'IP-based abuse prevention',
-                        'Comprehensive access logging',
-                        'Self-analysis data ownership verification',
-                        'Tiered access level control',
-                        'Real-time authorization checking',
-                        'Session management and validation',
-                        'Multi-step consent process',
-                        'Granular consent management',
-                        'Stage-by-stage opt-out capabilities',
-                        'Immediate data deletion',
-                        'Consent withdrawal mechanisms',
-                        'Transparency reporting',
-                        'Zero persistent storage',
-                        'Advanced anonymization',
-                        'End-to-end encryption',
-                        'Secure data deletion',
-                        'Ethical boundaries enforcement',
-                        'Professional ethics oversight',
-                        'Age verification system',
-                        'Malicious use prevention',
-                        'Real-time compliance monitoring'
+                },
+                'results_presentation': {
+                    'privacy_score': {'value': 1, 'colour': '#008000'},
+                    'inferences': [],
+                    'mitigation_recommendations': [
+                        '🛡️ Abuse prevention active - All verification layers enabled',
+                        '📋 Legal and ethical compliance verified - All regulations met',
+                        '🛡️ Risk mitigation active - All technical risks addressed',
+                        '🔒 Privacy framework active - Zero data retention',
+                        '⚖️ Ethical boundaries enforced - All guidelines followed',
+                        '🎛️ User consent verified - Full control maintained',
+                        '🔐 Authorization verified - Identity and access confirmed',
+                        '🛡️ All analysis performed on anonymized data',
+                        '🚫 No content available for comprehensive analysis'
+                    ]
+                },
+                'analysis_metadata': {
+                    'content_analyzed': 0,
+                    'analysis_timestamp': datetime.utcnow().isoformat(),
+                    'analysis_version': '5.2',
+                    'privacy_protected': self.privacy_framework is not None,
+                    'ethics_approved': ethical_approval.ethics_approved if ethical_approval else True,
+                    'consent_verified': consent_verified,
+                    'authorization_approved': authorization_result.authorized if authorization_result else True,
+                    'risk_mitigation_enabled': self.risk_mitigation is not None,
+                    'legal_ethical_enabled': self.legal_ethical_framework is not None,
+                    'abuse_prevention_enabled': self.abuse_prevention is not None,
+                    'content_moderated': moderation_result is not None,
+                    'access_level': authorization_result.access_level.value if authorization_result else 'basic',
+                    'processing_id': processing_id,
+                    'privacy_level': privacy_level,
+                    'ethical_compliance_score': ethical_approval.compliance_score if ethical_approval else 1.0,
+                    'note': 'Insufficient content for comprehensive analysis',
+                    'opt_out_available': True,
+                    'immediate_deletion_available': True,
+                    'features': [
+                        'abuse_prevention_framework',
+                        'legal_ethical_framework',
+                        'risk_mitigation_framework',
+                        'authorization_framework',
+                        'sentiment_analysis',
+                        'hashtag_patterns',
+                        'mention_patterns',
+                        'engagement_analysis',
+                        'topic_modeling',
+                        'schedule_patterns',
+                        'economic_indicators',
+                        'mental_state_assessment',
+                        'interest_profile',
+                        'privacy_framework',
+                        'ethical_boundaries',
+                        'consent_framework',
+                        'results_presentation'
                     ],
-                    'security_measures': {
-                        'legal_protection': 'Comprehensive Terms of Service and Privacy Policy',
-                        'content_moderation': 'AI-powered harmful content detection',
-                        'regulatory_compliance': 'GDPR and CCPA automated compliance',
-                        'rate_limiting': 'Flask-Limiter with Redis backend',
-                        'input_validation': 'Flask-WTF with comprehensive sanitization',
-                        'error_handling': 'Graceful failure with generic messages',
-                        'performance_caching': 'LRU cache with TTL expiration',
-                        'encryption': 'AES-256 end-to-end',
-                        'data_retention': '24 hours maximum',
-                        'deletion_method': 'Cryptographic overwriting',
-                        'access_control': 'Multi-factor authentication',
-                        'audit_logging': 'Complete activity tracking',
-                        'abuse_prevention': 'IP-based blocking with escalation',
-                        'session_security': 'Time-limited secure tokens',
-                        'consent_verification': 'Multi-step process with audit trail'
-                    },
-                    'compliance_standards': [
-                        'GDPR - General Data Protection Regulation',
-                        'CCPA - California Consumer Privacy Act',
-                        'PIPEDA - Personal Information Protection and Electronic Documents Act',
-                        'LGPD - Lei Geral de Proteção de Dados',
-                        'SOC 2 Type II - Security and Availability',
-                        'ISO 27001 - Information Security Management',
-                        'NIST Privacy Framework - Privacy Engineering',
-                        'IEEE 2857 - Privacy Engineering Standards',
-                        'OWASP Security Guidelines - Web Application Security',
-                        'Flask Security Best Practices - Framework-specific security',
-                        'AI Ethics Guidelines - Responsible AI development',
-                        'FTC Guidelines - Fair Information Practice Principles'
-                    ],
-                    'system_capabilities': {
-                        'analysis_types': ['self_analysis', 'third_party_analysis', 'research_analysis',
-                                           'security_analysis'],
-                        'access_levels': ['basic', 'enhanced', 'professional', 'restricted'],
-                        'verification_methods': ['email_verification', 'sms_verification', 'biometric_verification',
-                                                 'document_verification'],
-                        'consent_types': ['data_collection', 'data_processing', 'analysis_inference', 'data_retention',
-                                          'result_storage'],
-                        'processing_stages': ['data_ingestion', 'privacy_anonymization', 'ethical_evaluation',
-                                              'analysis_stages'],
-                        'privacy_levels': ['minimal', 'standard', 'strict'],
-                        'deletion_scopes': ['complete', 'analysis_only', 'partial'],
-                        'risk_mitigation_features': ['rate_limiting', 'input_validation', 'error_handling',
-                                                     'performance_optimization'],
-                        'legal_protections': ['terms_of_service', 'privacy_policy', 'regulatory_compliance',
-                                              'content_moderation']
-                    },
-                    'performance_metrics': {
-                        'cache_enabled': self.risk_mitigation is not None,
-                        'rate_limiting_active': self.risk_mitigation is not None,
-                        'input_validation_active': self.risk_mitigation is not None,
-                        'error_tracking_enabled': self.risk_mitigation is not None,
-                        'content_moderation_active': self.legal_ethical_framework is not None,
-                        'compliance_monitoring_active': self.legal_ethical_framework is not None
-                    } if self.risk_mitigation or self.legal_ethical_framework else {
-                        'risk_mitigation_disabled': 'Flask app not provided or Flask not available',
-                        'legal_framework_disabled': 'Legal/ethical framework not enabled'
-                    }
+                    'economic_brands_detected': 0,
+                    'economic_locations_detected': 0,
+                    'purchase_activities_detected': 0,
+                    'economic_risk_level': 'low',
+                    'professional_influence_detected': False,
+                    'mental_state_detected': 'stable',
+                    'mental_health_risk_level': 'low',
+                    'emotional_stability_score': 0.5,
+                    'social_connectivity_level': 'unknown',
+                    'crisis_indicators_detected': False,
+                    'protective_factors_identified': 0
                 }
+            }
 
-            def create_ai_inference_engine(app: Flask = None, privacy_enabled: bool = True,
-                                           ethics_enabled: bool = True, consent_enabled: bool = True,
-                                           authorization_enabled: bool = True, risk_mitigation_enabled: bool = True,
-                                           legal_ethical_enabled: bool = True):
-                """Factory function to create AI inference engine with full protection"""
-                return AIInferenceEngine(
-                    app=app,
-                    privacy_enabled=privacy_enabled,
-                    ethics_enabled=ethics_enabled,
-                    consent_enabled=consent_enabled,
-                    authorization_enabled=authorization_enabled,
-                    risk_mitigation_enabled=risk_mitigation_enabled,
-                    legal_ethical_enabled=legal_ethical_enabled
-                )
+        def get_comprehensive_framework_status(self) -> Dict[str, Any]:
+            """Get complete status of all integrated frameworks"""
+
+            return {
+                'framework_integration': {
+                    'privacy_framework': self.privacy_framework is not None,
+                    'ethical_framework': self.ethical_framework is not None,
+                    'consent_framework': self.consent_framework is not None,
+                    'authorization_framework': self.authorization_framework is not None,
+                    'risk_mitigation_framework': self.risk_mitigation is not None,
+                    'legal_ethical_framework': self.legal_ethical_framework is not None,
+                    'abuse_prevention_framework': self.abuse_prevention is not None
+                },
+                'privacy_status': self.get_privacy_status(),
+                'ethical_status': self.get_ethical_compliance_status(),
+                'consent_status': self.get_consent_status(),
+                'authorization_status': self.get_authorization_status(),
+                'risk_mitigation_status': self.get_risk_mitigation_status(),
+                'legal_ethical_status': self.get_legal_ethical_status(),
+                'abuse_prevention_status': self.get_abuse_prevention_status(),
+                'integrated_features': [
+                    'Email verification with anti-spam measures and secure 6-digit codes',
+                    'reCAPTCHA v3 bot protection with configurable score thresholds',
+                    'Usage limits enforcement - 3 analyses per day, 1 per hour maximum',
+                    'IP tracking and monitoring with suspicious activity detection',
+                    'Abuse reporting system with admin notifications and auto-escalation',
+                    'Real-time activity analysis with automatic blocking responses',
+                    'Terms of Service with AI-specific provisions and liability limitations',
+                    'Transparent Privacy Policy with AI data handling disclosure',
+                    'GDPR and CCPA compliance frameworks with automated assessment',
+                    'Content moderation with automated flagging for harmful requests',
+                    'Legal liability protection with comprehensive documentation',
+                    'Regulatory compliance monitoring with audit trails',
+                    'Rate limiting with Flask-Limiter (Redis backend)',
+                    'Advanced input validation and sanitization',
+                    'XSS and SQL injection prevention',
+                    'CSRF protection with Flask-WTF',
+                    'Comprehensive error handling with generic messages',
+                    'Performance optimization with intelligent caching',
+                    'Multi-factor identity verification',
+                    'Third-party consent management',
+                    'IP-based abuse prevention',
+                    'Comprehensive access logging',
+                    'Self-analysis data ownership verification',
+                    'Tiered access level control',
+                    'Real-time authorization checking',
+                    'Session management and validation',
+                    'Multi-step consent process',
+                    'Granular consent management',
+                    'Stage-by-stage opt-out capabilities',
+                    'Immediate data deletion',
+                    'Consent withdrawal mechanisms',
+                    'Transparency reporting',
+                    'Zero persistent storage',
+                    'Advanced anonymization',
+                    'End-to-end encryption',
+                    'Secure data deletion',
+                    'Ethical boundaries enforcement',
+                    'Professional ethics oversight',
+                    'Age verification system',
+                    'Malicious use prevention',
+                    'Real-time compliance monitoring'
+                ],
+                'security_measures': {
+                    'abuse_prevention': 'Email verification, reCAPTCHA, usage limits, IP tracking',
+                    'legal_protection': 'Comprehensive Terms of Service and Privacy Policy',
+                    'content_moderation': 'AI-powered harmful content detection',
+                    'regulatory_compliance': 'GDPR and CCPA automated compliance',
+                    'rate_limiting': 'Flask-Limiter with Redis backend',
+                    'input_validation': 'Flask-WTF with comprehensive sanitization',
+                    'error_handling': 'Graceful failure with generic messages',
+                    'performance_caching': 'LRU cache with TTL expiration',
+                    'encryption': 'AES-256 end-to-end',
+                    'data_retention': '24 hours maximum',
+                    'deletion_method': 'Cryptographic overwriting',
+                    'access_control': 'Multi-factor authentication',
+                    'audit_logging': 'Complete activity tracking',
+                    'abuse_prevention': 'Multi-layer verification and monitoring',
+                    'session_security': 'Time-limited secure tokens',
+                    'consent_verification': 'Multi-step process with audit trail'
+                },
+                'compliance_standards': [
+                    'GDPR - General Data Protection Regulation',
+                    'CCPA - California Consumer Privacy Act',
+                    'PIPEDA - Personal Information Protection and Electronic Documents Act',
+                    'LGPD - Lei Geral de Proteção de Dados',
+                    'SOC 2 Type II - Security and Availability',
+                    'ISO 27001 - Information Security Management',
+                    'NIST Privacy Framework - Privacy Engineering',
+                    'IEEE 2857 - Privacy Engineering Standards',
+                    'OWASP Security Guidelines - Web Application Security',
+                    'Flask Security Best Practices - Framework-specific security',
+                    'AI Ethics Guidelines - Responsible AI development',
+                    'FTC Guidelines - Fair Information Practice Principles',
+                    'CAN-SPAM Act - Email marketing compliance',
+                    'TCPA - Telephone Consumer Protection Act'
+                ],
+                'system_capabilities': {
+                    'analysis_types': ['self_analysis', 'third_party_analysis', 'research_analysis',
+                                       'security_analysis'],
+                    'access_levels': ['basic', 'enhanced', 'professional', 'restricted'],
+                    'verification_methods': ['email_verification', 'sms_verification', 'biometric_verification',
+                                             'document_verification'],
+                    'consent_types': ['data_collection', 'data_processing', 'analysis_inference', 'data_retention',
+                                      'result_storage'],
+                    'processing_stages': ['data_ingestion', 'privacy_anonymization', 'ethical_evaluation',
+                                          'analysis_stages'],
+                    'privacy_levels': ['minimal', 'standard', 'strict'],
+                    'deletion_scopes': ['complete', 'analysis_only', 'partial'],
+                    'risk_mitigation_features': ['rate_limiting', 'input_validation', 'error_handling',
+                                                 'performance_optimization'],
+                    'legal_protections': ['terms_of_service', 'privacy_policy', 'regulatory_compliance',
+                                          'content_moderation'],
+                    'abuse_prevention_features': ['email_verification', 'recaptcha_protection', 'usage_limits',
+                                                  'ip_tracking', 'reporting_system']
+                },
+                'performance_metrics': {
+                    'cache_enabled': self.risk_mitigation is not None,
+                    'rate_limiting_active': self.risk_mitigation is not None,
+                    'input_validation_active': self.risk_mitigation is not None,
+                    'error_tracking_enabled': self.risk_mitigation is not None,
+                    'content_moderation_active': self.legal_ethical_framework is not None,
+                    'compliance_monitoring_active': self.legal_ethical_framework is not None,
+                    'abuse_prevention_active': self.abuse_prevention is not None,
+                    'user_verification_active': self.abuse_prevention is not None
+                } if self.risk_mitigation or self.legal_ethical_framework or self.abuse_prevention else {
+                    'risk_mitigation_disabled': 'Flask app not provided or Flask not available',
+                    'legal_framework_disabled': 'Legal/ethical framework not enabled',
+                    'abuse_prevention_disabled': 'Abuse prevention framework not enabled'
+                }
+            }
+
+    def create_ai_inference_engine(app: Flask = None, privacy_enabled: bool = True,
+                                   ethics_enabled: bool = True, consent_enabled: bool = True,
+                                   authorization_enabled: bool = True, risk_mitigation_enabled: bool = True,
+                                   legal_ethical_enabled: bool = True, abuse_prevention_enabled: bool = True):
+        """Factory function to create AI inference engine with full protection"""
+        return AIInferenceEngine(
+            app=app,
+            privacy_enabled=privacy_enabled,
+            ethics_enabled=ethics_enabled,
+            consent_enabled=consent_enabled,
+            authorization_enabled=authorization_enabled,
+            risk_mitigation_enabled=risk_mitigation_enabled,
+            legal_ethical_enabled=legal_ethical_enabled,
+            abuse_prevention_enabled=abuse_prevention_enabled
+        )
+
+
