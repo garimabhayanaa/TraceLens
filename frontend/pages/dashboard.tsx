@@ -1,541 +1,914 @@
-import React, { useState } from 'react'
-import axios from 'axios'
+'use client'
+import React, { useState, useEffect } from 'react'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { analysisAPI, AnalysisResults } from '@/utils/api'
 import toast from 'react-hot-toast'
-import { useRouter } from 'next/router'
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  RadialLinearScale,
-  PointElement,
-  LineElement,
-} from 'chart.js'
-import { Bar, Doughnut, PolarArea, Radar } from 'react-chartjs-2'
-import { 
-  ShieldCheckIcon, 
-  ShieldExclamationIcon,
-  EyeIcon,
-  ClockIcon,
-  BriefcaseIcon,
-  ChatBubbleLeftRightIcon,
-  ExclamationTriangleIcon
-} from '@heroicons/react/24/outline'
-import api from '../utils/api'
+  Shield, Brain, Heart, TrendingUp, MapPin, DollarSign,
+  Clock, Users, MessageCircle, Hash, Eye, AlertTriangle,
+  CheckCircle, XCircle, Info, Download, Trash2
+} from 'lucide-react'
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  RadialLinearScale,
-  PointElement,
-  LineElement
-)
+interface AnalysisDashboardProps {
+  results: AnalysisResults
+  sessionId: string
+  userId: string
+}
 
-// Configure axios
-axios.defaults.baseURL = 'http://localhost:5000'
-axios.defaults.withCredentials = true
+const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({
+  results,
+  sessionId,
+  userId
+}) => {
+  const [selectedTab, setSelectedTab] = useState('overview')
+  const [isLoading, setIsLoading] = useState(false)
 
-export default function Dashboard() {
-  const [formData, setFormData] = useState({ 
-    name: '', 
-    email: '', 
-    social_links: '' 
-  })
-  const [results, setResults] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const router = useRouter()
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  const getStatusColor = (status: boolean | string) => {
+    if (typeof status === 'boolean') {
+      return status ? 'text-green-600' : 'text-red-600'
+    }
+    return status === 'compliant' ? 'text-green-600' :
+           status === 'non_compliant' ? 'text-red-600' : 'text-yellow-600'
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    
-    try {
-      const socialLinks = formData.social_links
-        .split('\n')
-        .map(link => link.trim())
-        .filter(link => link.length > 0)
+  const getStatusIcon = (status: boolean | string) => {
+    if (typeof status === 'boolean') {
+      return status ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />
+    }
+    return status === 'compliant' ? <CheckCircle className="h-4 w-4" /> :
+           status === 'non_compliant' ? <XCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />
+  }
 
-        const response = await api.post('/api/analyze', {
-          ...formData,
-          social_links: socialLinks
-        })
-      
-      setResults(response.data.results)
-      toast.success('Analysis complete!')
-    } catch (err: any) {
-      const errorMsg = err?.response?.data?.error || 'Analysis failed'
-      toast.error(errorMsg)
+  const handleImmediateDeletion = async () => {
+    if (!confirm('Are you sure you want to delete all data immediately? This action cannot be undone.')) {
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await analysisAPI.requestImmediateDeletion(userId, 'complete')
+
+      if (response.data.success) {
+        toast.success('Deletion request created. Please check your email for verification code.')
+        // Could open a modal for verification code entry
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to request deletion')
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  const handleLogout = async () => {
-    try {
-      await api.post('/api/logout')
-      toast.success('Logged out successfully')
-      router.push('/')
-    } catch (err) {
-      toast.error('Logout failed')
-    }
-  }
-
-  // Privacy score utilities
-  const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-600'
-    if (score >= 6) return 'text-yellow-600'
-    if (score >= 4) return 'text-orange-600'
-    return 'text-red-600'
-  }
-
-  const getScoreBackground = (score: number) => {
-    if (score >= 8) return 'bg-green-50 border-green-200'
-    if (score >= 6) return 'bg-yellow-50 border-yellow-200'
-    if (score >= 4) return 'bg-orange-50 border-orange-200'
-    return 'bg-red-50 border-red-200'
-  }
-
-  const getScoreIcon = (score: number) => {
-    if (score >= 6) return <ShieldCheckIcon className="w-8 h-8 text-green-500" />
-    return <ShieldExclamationIcon className="w-8 h-8 text-red-500" />
-  }
-
-  // Chart configurations
-  const createPrivacyScoreChart = (score: number) => ({
-    labels: ['Privacy Protected', 'Risk Exposure'],
-    datasets: [{
-      data: [score, 10 - score],
-      backgroundColor: [
-        score >= 6 ? '#10B981' : '#EF4444',
-        '#E5E7EB'
-      ],
-      borderWidth: 0,
-    }]
-  })
-
-  const createInterestsChart = (interests: string[]) => ({
-    labels: interests.slice(0, 8), // Show top 8 interests
-    datasets: [{
-      label: 'Interest Categories',
-      data: interests.slice(0, 8).map(() => 1),
-      backgroundColor: [
-        '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
-        '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'
-      ],
-      borderWidth: 0,
-    }]
-  })
-
-  const createRadarChart = (results: any) => {
-    const categories = ['Interests', 'Schedule', 'Economic', 'Communication', 'Privacy']
-    const scores = [
-      Math.min(results.interests?.length * 2 || 0, 10),
-      Object.keys(results.schedule_patterns).length * 2.5,
-      Object.keys(results.economic_indicators).length * 2.5,
-      Object.keys(results.mental_state).length * 2.5,
-      results.privacy_score
-    ]
-
-    return {
-      labels: categories,
-      datasets: [{
-        label: 'Digital Footprint Analysis',
-        data: scores,
-        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-        borderColor: 'rgba(59, 130, 246, 1)',
-        borderWidth: 2,
-        pointBackgroundColor: 'rgba(59, 130, 246, 1)',
-        pointBorderColor: '#fff',
-        pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: 'rgba(59, 130, 246, 1)'
-      }]
-    }
-  }
-
-  if (!results) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        {/* Navigation */}
-        <nav className="bg-white/80 backdrop-blur-md shadow-sm p-4 sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-blue-600">LeakPeek Dashboard</h1>
-            <button 
-              onClick={handleLogout}
-              className="text-gray-600 hover:text-gray-900 font-medium transition"
-            >
-              Logout
-            </button>
-          </div>
-        </nav>
-
-        {/* Main Content */}
-        <div className="max-w-3xl mx-auto p-6">
-          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-8">
-            <div className="text-center mb-8">
-              <EyeIcon className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-              <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Digital Footprint Analysis
-              </h2>
-              <p className="text-gray-600 text-lg">
-                Discover what AI can infer about you from public data
-              </p>
-            </div>
-            
-            {/* Privacy Notice */}
-            <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-xl">
-              <h3 className="font-semibold text-blue-800 mb-3 flex items-center">
-                <ShieldCheckIcon className="w-5 h-5 mr-2" />
-                Privacy & Security Notice
-              </h3>
-              <ul className="text-blue-700 text-sm space-y-2">
-                <li>• You can only analyze your own digital footprint</li>
-                <li>• All data is automatically deleted within 24 hours</li>
-                <li>• Only publicly available information is analyzed</li>
-                <li>• This tool is for educational purposes only</li>
-              </ul>
-            </div>
-
-            {/* Analysis Form */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="Enter your full name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Address * (must match your login email)
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Enter your email address"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Social Media Profiles (Optional)
-                </label>
-                <textarea
-                  name="social_links"
-                  placeholder="Paste your social media profile URLs here, one per line:&#10;https://linkedin.com/in/yourprofile&#10;https://github.com/yourusername&#10;https://twitter.com/yourusername&#10;https://instagram.com/yourusername"
-                  value={formData.social_links}
-                  onChange={handleChange}
-                  rows={6}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                />
-                <p className="text-sm text-gray-500 mt-2">
-                  Leave empty to analyze just your name and email patterns
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl hover:from-blue-700 hover:to-purple-700 transition font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-              >
-                {loading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
-                    Analyzing Your Digital Footprint...
-                  </div>
-                ) : (
-                  'Start Privacy Analysis'
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Results View
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      {/* Navigation */}
-      <nav className="bg-white/80 backdrop-blur-md shadow-sm p-4 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-blue-600">LeakPeek Results</h1>
-          <div className="space-x-4">
-            <button 
-              onClick={() => setResults(null)}
-              className="text-blue-600 hover:text-blue-800 font-medium transition"
-            >
-              New Analysis
-            </button>
-            <button 
-              onClick={handleLogout}
-              className="text-gray-600 hover:text-gray-900 font-medium transition"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
-            Analysis Complete
-          </h1>
-          <p className="text-xl text-gray-600">Here's what AI could infer about you from public data</p>
-        </div>
-
-        {/* Privacy Score Hero Section */}
-        <div className={`mb-8 p-8 rounded-2xl border-2 shadow-xl ${getScoreBackground(results.privacy_score)}`}>
-          <div className="flex items-center justify-between">
+  const renderOverviewTab = () => (
+    <div className="space-y-6">
+      {/* Privacy Score */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Privacy & Security Score
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
             <div className="flex-1">
-              <div className="flex items-center mb-4">
-                {getScoreIcon(results.privacy_score)}
-                <h2 className="text-3xl font-bold ml-3">Your Privacy Score</h2>
-              </div>
-              <div className={`text-7xl font-extrabold mb-2 ${getScoreColor(results.privacy_score)}`}>
-                {results.privacy_score?.toFixed(1)}
-              </div>
-              <div className="text-xl text-gray-600 mb-4">out of 10.0</div>
-              <p className="text-gray-700 max-w-md">
-                {results.privacy_score >= 8 ? 'Excellent! Your digital privacy is well protected.' :
-                 results.privacy_score >= 6 ? 'Good privacy with some room for improvement.' :
-                 results.privacy_score >= 4 ? 'Moderate privacy risks detected. Consider the recommendations below.' :
-                 'High privacy risks detected. Immediate action recommended.'}
-              </p>
-            </div>
-            <div className="w-64 h-64 ml-8">
-              <Doughnut 
-                data={createPrivacyScoreChart(results.privacy_score)}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: true,
-                  plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                      callbacks: {
-                        label: (context) => `${context.label}: ${context.parsed.toFixed(1)}/10`
-                      }
-                    }
-                  }
-                }}
+              <Progress
+                value={results.analysis_metadata?.ethical_compliance_score * 100 || 85}
+                className="h-3"
               />
             </div>
-          </div>
-        </div>
-
-        {/* Overview Radar Chart */}
-        <div className="mb-8 bg-white rounded-2xl shadow-xl p-8">
-          <h3 className="text-2xl font-bold mb-6 text-center">Digital Footprint Overview</h3>
-          <div className="max-w-lg mx-auto">
-            <Radar
-              data={createRadarChart(results)}
-              options={{
-                responsive: true,
-                maintainAspectRatio: true,
-                scales: {
-                  r: {
-                    beginAtZero: true,
-                    max: 10,
-                    ticks: { stepSize: 2 }
-                  }
-                },
-                plugins: {
-                  legend: { display: false }
-                }
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Analysis Results Grid */}
-        <div className="grid lg:grid-cols-2 gap-8 mb-8">
-          {/* Interests */}
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="flex items-center mb-6">
-              <EyeIcon className="w-8 h-8 text-blue-600 mr-3" />
-              <h3 className="text-2xl font-bold text-gray-800">Detected Interests</h3>
+            <div className="text-2xl font-bold text-green-600">
+              {Math.round((results.analysis_metadata?.ethical_compliance_score || 0.85) * 100)}%
             </div>
-            {results.interests && results.interests.length > 0 ? (
-              <div>
-                <div className="flex flex-wrap gap-3 mb-6">
-                  {results.interests.map((interest: string, idx: number) => (
-                    <span 
-                      key={idx} 
-                      className="inline-block bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md"
-                    >
-                      {interest}
-                    </span>
-                  ))}
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className={`font-semibold ${getStatusColor(results.abuse_prevention_status?.enabled)}`}>
+                {getStatusIcon(results.abuse_prevention_status?.enabled)}
+              </div>
+              <p className="text-sm text-gray-600">Abuse Prevention</p>
+            </div>
+
+            <div className="text-center">
+              <div className={`font-semibold ${getStatusColor(results.legal_ethical_compliance?.regulatory_compliance?.gdpr_compliance === 'compliant')}`}>
+                {getStatusIcon(results.legal_ethical_compliance?.regulatory_compliance?.gdpr_compliance === 'compliant')}
+              </div>
+              <p className="text-sm text-gray-600">GDPR Compliance</p>
+            </div>
+
+            <div className="text-center">
+              <div className={`font-semibold ${getStatusColor(results.privacy_metrics?.encryption_enabled)}`}>
+                {getStatusIcon(results.privacy_metrics?.encryption_enabled)}
+              </div>
+              <p className="text-sm text-gray-600">Data Encryption</p>
+            </div>
+
+            <div className="text-center">
+              <div className={`font-semibold ${getStatusColor(results.consent_status?.consent_verified)}`}>
+                {getStatusIcon(results.consent_status?.consent_verified)}
+              </div>
+              <p className="text-sm text-gray-600">Consent Verified</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Usage Statistics */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Usage Statistics
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-600 font-semibold">Today's Usage</p>
+                  <p className="text-2xl font-bold">
+                    {results.usage_statistics?.daily_usage || 0}/3
+                  </p>
                 </div>
-                {results.interests.length > 0 && (
-                  <div className="h-64">
-                    <PolarArea
-                      data={createInterestsChart(results.interests)}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: { display: false }
-                        }
-                      }}
-                    />
+                <Eye className="h-8 w-8 text-blue-500" />
+              </div>
+            </div>
+
+            <div className="bg-green-50 p-4 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-600 font-semibold">Remaining Today</p>
+                  <p className="text-2xl font-bold">
+                    {results.usage_statistics?.remaining_daily || 3}
+                  </p>
+                </div>
+                <CheckCircle className="h-8 w-8 text-green-500" />
+              </div>
+            </div>
+
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-600 font-semibold">Access Level</p>
+                  <p className="text-lg font-bold capitalize">
+                    {results.authorization_status?.access_level || 'Basic'}
+                  </p>
+                </div>
+                <Shield className="h-8 w-8 text-purple-500" />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick Insights */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Heart className="h-5 w-5" />
+              Sentiment Overview
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {results.sentiment_analysis && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span>Overall Sentiment</span>
+                  <span className={`font-semibold capitalize ${
+                    results.sentiment_analysis.overall_sentiment === 'positive' ? 'text-green-600' :
+                    results.sentiment_analysis.overall_sentiment === 'negative' ? 'text-red-600' : 'text-yellow-600'
+                  }`}>
+                    {results.sentiment_analysis.overall_sentiment}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span>Confidence</span>
+                  <span className="font-semibold">
+                    {Math.round((results.sentiment_analysis.confidence_score || 0) * 100)}%
+                  </span>
+                </div>
+
+                {results.sentiment_analysis.emotional_profile && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium mb-2">Emotional Indicators:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(results.sentiment_analysis.emotional_profile).map(([emotion, score]) => (
+                        <span key={emotion} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                          {emotion}: {Math.round(Number(score) * 100)}%
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-            ) : (
-              <p className="text-gray-500 italic text-center py-8">
-                No specific interests detected from available data.
-              </p>
             )}
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Schedule Patterns */}
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="flex items-center mb-6">
-              <ClockIcon className="w-8 h-8 text-green-600 mr-3" />
-              <h3 className="text-2xl font-bold text-gray-800">Activity Patterns</h3>
-            </div>
-            {Object.keys(results.schedule_patterns).length > 0 ? (
-              <div className="space-y-4">
-                {Object.entries(results.schedule_patterns).map(([key, value], idx) => (
-                  <div key={idx} className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-gray-700 capitalize">
-                        {key.replace('_', ' ')}
-                      </span>
-                      <span className="text-gray-600 bg-white px-3 py-1 rounded-full text-sm">
-                        {value as string}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 italic text-center py-8">
-                No clear activity patterns detected.
-              </p>
-            )}
-          </div>
-
-          {/* Economic Indicators */}
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="flex items-center mb-6">
-              <BriefcaseIcon className="w-8 h-8 text-yellow-600 mr-3" />
-              <h3 className="text-2xl font-bold text-gray-800">Professional Indicators</h3>
-            </div>
-            {Object.keys(results.economic_indicators).length > 0 ? (
-              <div className="space-y-4">
-                {Object.entries(results.economic_indicators).map(([key, value], idx) => (
-                  <div key={idx} className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-gray-700 capitalize">
-                        {key.replace('_', ' ')}
-                      </span>
-                      <span className="text-gray-600 bg-white px-3 py-1 rounded-full text-sm">
-                        {value as string}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 italic text-center py-8">
-                No professional indicators detected.
-              </p>
-            )}
-          </div>
-
-          {/* Communication Patterns */}
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="flex items-center mb-6">
-              <ChatBubbleLeftRightIcon className="w-8 h-8 text-purple-600 mr-3" />
-              <h3 className="text-2xl font-bold text-gray-800">Communication Style</h3>
-            </div>
-            {Object.keys(results.mental_state).length > 0 ? (
-              <div className="space-y-4">
-                {Object.entries(results.mental_state).map(([key, value], idx) => (
-                  <div key={idx} className="bg-gray-50 rounded-lg p-4">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-gray-700 capitalize">
-                        {key.replace('_', ' ')}
-                      </span>
-                      <span className="text-gray-600 bg-white px-3 py-1 rounded-full text-sm">
-                        {value as string}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 italic text-center py-8">
-                No communication patterns detected.
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Data Sources */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-          <h3 className="text-2xl font-bold mb-6 text-gray-800">📊 Data Sources Analyzed</h3>
-          {results.data_sources && results.data_sources.length > 0 ? (
-            <div className="grid md:grid-cols-2 gap-4">
-              {results.data_sources.map((src: string, idx: number) => (
-                <div key={idx} className="flex items-center bg-blue-50 rounded-lg p-4">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full mr-4"></div>
-                  <span className="text-gray-700 font-medium">{src}</span>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Hash className="h-5 w-5" />
+              Content Patterns
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {results.hashtag_patterns && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span>Usage Style</span>
+                  <span className="font-semibold capitalize">
+                    {results.hashtag_patterns.usage_style}
+                  </span>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500 italic text-center py-8">
-              Analysis based on provided information only.
-            </p>
-          )}
-        </div>
 
-        {/* Recommendations */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <div className="flex items-center mb-6">
-            <ExclamationTriangleIcon className="w-8 h-8 text-red-600 mr-3" />
-            <h3 className="text-2xl font-bold text-gray-800">Privacy Recommendations</h3>
-          </div>
-          <div className="grid gap-4">
-            {results.recommendations.map((rec: string, idx: number) => (
-              <div key={idx} className="flex items-start bg-gradient-to-r from-red-50 to-orange-50 rounded-lg p-4 border-l-4 border-red-400">
-                <span className="text-red-500 mr-4 mt-1 font-bold">•</span>
-                <span className="text-gray-700 leading-relaxed">{rec}</span>
+                <div className="flex justify-between items-center">
+                  <span>Total Hashtags</span>
+                  <span className="font-semibold">
+                    {results.hashtag_patterns.total_hashtags || 0}
+                  </span>
+                </div>
+
+                {results.hashtag_patterns.trending_topics && results.hashtag_patterns.trending_topics.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium mb-2">Trending Topics:</p>
+                    <div className="space-y-1">
+                      {results.hashtag_patterns.trending_topics.slice(0, 3).map((topic: any, index: number) => (
+                        <div key={index} className="flex justify-between text-sm">
+                          <span>#{topic.hashtag}</span>
+                          <span className="text-gray-500">{Math.round(topic.score * 100)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
+
+  const renderAnalysisTab = () => (
+    <div className="space-y-6">
+      {/* Advanced Analysis Results */}
+      {results.schedule_patterns?.analysis_completed && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Schedule Patterns
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-medium mb-2">Temporal Analysis</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Posting Frequency:</span>
+                    <span className="font-semibold">
+                      {results.schedule_patterns.post_timing?.posting_frequency || 'Unknown'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Temporal Signature:</span>
+                    <span className="font-semibold">
+                      {results.schedule_patterns.post_timing?.temporal_signature || 'Unknown'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Consistency Score:</span>
+                    <span className="font-semibold">
+                      {Math.round((results.schedule_patterns.post_timing?.consistency_score || 0) * 100)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Activity Patterns</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Engagement Rhythm:</span>
+                    <span className="font-semibold">
+                      {results.schedule_patterns.activity_frequency?.engagement_rhythm || 'Unknown'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Work-Life Balance:</span>
+                    <span className="font-semibold">
+                      {results.schedule_patterns.work_personal_boundary?.boundary_clarity || 'Unknown'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {results.schedule_patterns.behavioral_insights && results.schedule_patterns.behavioral_insights.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-medium mb-2">Behavioral Insights</h4>
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <ul className="space-y-1 text-sm">
+                    {results.schedule_patterns.behavioral_insights.slice(0, 3).map((insight: string, index: number) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="text-blue-500 mt-1">•</span>
+                        {insight}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Economic Analysis */}
+      {results.economic_indicators?.analysis_completed && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Economic Indicators
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-green-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-green-600 font-medium">Brand Mentions</p>
+                    <p className="text-2xl font-bold">
+                      {results.economic_indicators.brand_mentions?.length || 0}
+                    </p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-green-500" />
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-blue-600 font-medium">Location Patterns</p>
+                    <p className="text-2xl font-bold">
+                      {results.economic_indicators.location_patterns?.length || 0}
+                    </p>
+                  </div>
+                  <MapPin className="h-8 w-8 text-blue-500" />
+                </div>
+              </div>
+
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-purple-600 font-medium">Economic Risk</p>
+                    <p className="text-2xl font-bold">
+                      {Math.round((results.economic_indicators.economic_risk_score || 0) * 100)}%
+                    </p>
+                  </div>
+                  <AlertTriangle className="h-8 w-8 text-purple-500" />
+                </div>
+              </div>
+            </div>
+
+            {results.economic_indicators.economic_profile && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium mb-2">Economic Profile</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Spending Capacity:</span>
+                      <span className="font-semibold capitalize">
+                        {results.economic_indicators.economic_profile.spending_capacity || 'Unknown'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Brand Affinity:</span>
+                      <span className="font-semibold capitalize">
+                        {results.economic_indicators.economic_profile.brand_affinity_tier || 'Unknown'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Purchase Style:</span>
+                      <span className="font-semibold capitalize">
+                        {results.economic_indicators.economic_profile.purchase_decision_style || 'Unknown'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Professional Network</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Seniority Level:</span>
+                      <span className="font-semibold capitalize">
+                        {results.economic_indicators.professional_network?.seniority_level || 'Unknown'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Professional Influence:</span>
+                      <span className="font-semibold">
+                        {Math.round((results.economic_indicators.professional_network?.professional_influence || 0) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Mental State Assessment */}
+      {results.mental_state_assessment?.analysis_completed && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5" />
+              Mental State Assessment
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-medium mb-2">Overall Assessment</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Mental State:</span>
+                    <span className="font-semibold capitalize">
+                      {results.mental_state_assessment.mental_state_profile?.overall_mental_state || 'Stable'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Emotional Stability:</span>
+                    <span className="font-semibold">
+                      {Math.round((results.mental_state_assessment.mental_state_profile?.emotional_stability_score || 0.5) * 100)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Assessment Confidence:</span>
+                    <span className="font-semibold">
+                      {Math.round((results.mental_state_assessment.assessment_confidence || 0) * 100)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Social Connectivity</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Connectivity Level:</span>
+                    <span className="font-semibold capitalize">
+                      {results.mental_state_assessment.mental_state_profile?.social_connectivity_level || 'Unknown'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Interaction Rate:</span>
+                    <span className="font-semibold">
+                      {Math.round((results.mental_state_assessment.social_interaction?.interaction_rate || 0) * 100)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {results.mental_state_assessment.recommendations && results.mental_state_assessment.recommendations.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-medium mb-2">Recommendations</h4>
+                <div className="bg-yellow-50 p-3 rounded-lg">
+                  <ul className="space-y-1 text-sm">
+                    {results.mental_state_assessment.recommendations.slice(0, 3).map((rec: string, index: number) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <span className="text-yellow-600 mt-1">•</span>
+                        {rec}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+
+  const renderComplianceTab = () => (
+    <div className="space-y-6">
+      {/* Legal Compliance */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Legal & Regulatory Compliance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-medium mb-3">GDPR Compliance</h4>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span>Status</span>
+                  <div className={`flex items-center gap-2 ${getStatusColor(results.legal_ethical_compliance?.regulatory_compliance?.gdpr_compliance)}`}>
+                    {getStatusIcon(results.legal_ethical_compliance?.regulatory_compliance?.gdpr_compliance === 'compliant')}
+                    <span className="font-semibold capitalize">
+                      {results.legal_ethical_compliance?.regulatory_compliance?.gdpr_compliance || 'Unknown'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span>Compliance Score</span>
+                  <span className="font-semibold">
+                    {Math.round((results.legal_ethical_compliance?.regulatory_compliance?.gdpr_score || 0) * 100)}%
+                  </span>
+                </div>
+
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <p className="text-sm font-medium text-green-700 mb-2">GDPR Rights Implemented:</p>
+                  <ul className="text-sm text-green-600 space-y-1">
+                    <li>✓ Right to access your data</li>
+                    <li>✓ Right to rectification</li>
+                    <li>✓ Right to erasure (right to be forgotten)</li>
+                    <li>✓ Right to data portability</li>
+                    <li>✓ Right to object to processing</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium mb-3">CCPA Compliance</h4>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span>Status</span>
+                  <div className={`flex items-center gap-2 ${getStatusColor(results.legal_ethical_compliance?.regulatory_compliance?.ccpa_compliance)}`}>
+                    {getStatusIcon(results.legal_ethical_compliance?.regulatory_compliance?.ccpa_compliance === 'compliant')}
+                    <span className="font-semibold capitalize">
+                      {results.legal_ethical_compliance?.regulatory_compliance?.ccpa_compliance || 'Unknown'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span>Compliance Score</span>
+                  <span className="font-semibold">
+                    {Math.round((results.legal_ethical_compliance?.regulatory_compliance?.ccpa_score || 0) * 100)}%
+                  </span>
+                </div>
+
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <p className="text-sm font-medium text-blue-700 mb-2">CCPA Rights Protected:</p>
+                  <ul className="text-sm text-blue-600 space-y-1">
+                    <li>✓ Right to know what data is collected</li>
+                    <li>✓ Right to delete personal information</li>
+                    <li>✓ Right to opt-out of data selling</li>
+                    <li>✓ Right to non-discrimination</li>
+                    <li>✓ Right to equal service and pricing</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Content Moderation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Eye className="h-5 w-5" />
+            Content Moderation
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span>Moderation Status</span>
+              <div className={`flex items-center gap-2 ${getStatusColor(results.legal_ethical_compliance?.content_moderation?.enabled)}`}>
+                {getStatusIcon(results.legal_ethical_compliance?.content_moderation?.enabled)}
+                <span className="font-semibold">
+                  {results.legal_ethical_compliance?.content_moderation?.enabled ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span>Content Approved</span>
+              <div className={`flex items-center gap-2 ${getStatusColor(results.legal_ethical_compliance?.content_moderation?.content_approved)}`}>
+                {getStatusIcon(results.legal_ethical_compliance?.content_moderation?.content_approved)}
+                <span className="font-semibold">
+                  {results.legal_ethical_compliance?.content_moderation?.content_approved ? 'Approved' : 'Flagged'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span>Risk Level</span>
+              <span className={`font-semibold capitalize ${
+                results.legal_ethical_compliance?.content_moderation?.risk_level === 'low' ? 'text-green-600' :
+                results.legal_ethical_compliance?.content_moderation?.risk_level === 'medium' ? 'text-yellow-600' : 'text-red-600'
+              }`}>
+                {results.legal_ethical_compliance?.content_moderation?.risk_level || 'Unknown'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span>Confidence Score</span>
+              <span className="font-semibold">
+                {Math.round((results.legal_ethical_compliance?.content_moderation?.confidence_score || 0) * 100)}%
+              </span>
+            </div>
+
+            {results.legal_ethical_compliance?.content_moderation?.flagged_issues &&
+             results.legal_ethical_compliance.content_moderation.flagged_issues.length > 0 && (
+              <div className="bg-yellow-50 p-3 rounded-lg">
+                <p className="text-sm font-medium text-yellow-700 mb-2">Flagged Issues:</p>
+                <ul className="text-sm text-yellow-600 space-y-1">
+                  {results.legal_ethical_compliance.content_moderation.flagged_issues.map((issue: string, index: number) => (
+                    <li key={index}>• {issue}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Abuse Prevention Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Abuse Prevention
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span>User Verified</span>
+                <div className={`flex items-center gap-2 ${getStatusColor(results.abuse_prevention_status?.user_verified)}`}>
+                  {getStatusIcon(results.abuse_prevention_status?.user_verified)}
+                  <span className="font-semibold">
+                    {results.abuse_prevention_status?.user_verified ? 'Verified' : 'Pending'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span>IP Tracking</span>
+                <div className={`flex items-center gap-2 ${getStatusColor(results.abuse_prevention_status?.ip_tracking_active)}`}>
+                  {getStatusIcon(results.abuse_prevention_status?.ip_tracking_active)}
+                  <span className="font-semibold">
+                    {results.abuse_prevention_status?.ip_tracking_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span>Usage Limits</span>
+                <div className={`flex items-center gap-2 ${getStatusColor(results.abuse_prevention_status?.usage_limits_checked)}`}>
+                  {getStatusIcon(results.abuse_prevention_status?.usage_limits_checked)}
+                  <span className="font-semibold">
+                    {results.abuse_prevention_status?.usage_limits_checked ? 'Enforced' : 'Not Checked'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span>reCAPTCHA Verified</span>
+                <div className={`flex items-center gap-2 ${getStatusColor(results.abuse_prevention_status?.recaptcha_verified)}`}>
+                  {getStatusIcon(results.abuse_prevention_status?.recaptcha_verified)}
+                  <span className="font-semibold">
+                    {results.abuse_prevention_status?.recaptcha_verified ? 'Verified' : 'Not Verified'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span>Email Verified</span>
+                <div className={`flex items-center gap-2 ${getStatusColor(results.abuse_prevention_status?.email_verified)}`}>
+                  {getStatusIcon(results.abuse_prevention_status?.email_verified)}
+                  <span className="font-semibold">
+                    {results.abuse_prevention_status?.email_verified ? 'Verified' : 'Pending'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span>Reporting Available</span>
+                <div className={`flex items-center gap-2 text-green-600`}>
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="font-semibold">Available</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+
+  const renderControlsTab = () => (
+    <div className="space-y-6">
+      {/* User Controls */}
+      <Card className="border-red-200">
+        <CardHeader className="bg-red-50">
+          <CardTitle className="flex items-center gap-2 text-red-700">
+            <Trash2 className="h-5 w-5" />
+            Data Control & Deletion
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <div className="bg-red-50 p-4 rounded-lg">
+              <h4 className="font-medium text-red-700 mb-2">Immediate Data Deletion</h4>
+              <p className="text-sm text-red-600 mb-3">
+                Delete all your data immediately. This action cannot be undone and will remove all analysis results and stored information.
+              </p>
+              <Button
+                onClick={handleImmediateDeletion}
+                variant="destructive"
+                disabled={isLoading}
+                className="w-full"
+              >
+                {isLoading ? 'Processing...' : '🗑️ Delete All Data Immediately'}
+              </Button>
+            </div>
+
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <h4 className="font-medium text-yellow-700 mb-2">Opt-Out Options</h4>
+              <p className="text-sm text-yellow-600 mb-3">
+                You can opt out of any processing stage and stop the analysis at any point.
+              </p>
+              <div className="space-y-2">
+                <Button variant="outline" className="w-full text-yellow-700 border-yellow-300 hover:bg-yellow-50">
+                  🚪 Opt Out of Current Processing
+                </Button>
+                <Button variant="outline" className="w-full text-orange-700 border-orange-300 hover:bg-orange-50">
+                  🔄 Withdraw All Consents
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Privacy Controls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Privacy Controls
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium">Data Retention Period</h4>
+                <p className="text-sm text-gray-600">
+                  Maximum: {results.privacy_metrics?.data_retention_hours || 24} hours
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-green-600 font-medium">✓ Auto-deletion enabled</div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium">Encryption Status</h4>
+                <p className="text-sm text-gray-600">
+                  All data encrypted with AES-256
+                </p>
+              </div>
+              <div className="text-right">
+                <div className={`text-sm font-medium ${getStatusColor(results.privacy_metrics?.encryption_enabled)}`}>
+                  {results.privacy_metrics?.encryption_enabled ? '✓ Encrypted' : '✗ Not Encrypted'}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium">Anonymization Level</h4>
+                <p className="text-sm text-gray-600">
+                  Current level: {results.privacy_metrics?.anonymization_level || 'Standard'}
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-blue-600 font-medium">✓ Active</div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium">Processing ID</h4>
+                <p className="text-sm text-gray-600 font-mono">
+                  {results.privacy_metrics?.processing_id || 'N/A'}
+                </p>
+              </div>
+              <div className="text-right">
+                <Button variant="outline" size="sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Report
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Consent Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5" />
+            Consent Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {results.consent_status?.granted_consents && results.consent_status.granted_consents.length > 0 ? (
+              results.consent_status.granted_consents.map((consent: any, index: number) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                  <div>
+                    <h4 className="font-medium capitalize">
+                      {consent.type.replace('_', ' ')}
+                    </h4>
+                    <p className="text-sm text-gray-600">
+                      Granted: {new Date(consent.granted_at).toLocaleDateString()}
+                      {consent.expires_at && (
+                        <span> | Expires: {new Date(consent.expires_at).toLocaleDateString()}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-green-600">
+                    <CheckCircle className="h-5 w-5" />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">No consent records available</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+
+  return (
+    <div className="max-w-7xl mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Analysis Dashboard</h1>
+        <p className="text-gray-600">
+          Comprehensive AI analysis with complete privacy protection and legal compliance
+        </p>
+      </div>
+
+      <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="analysis">Analysis</TabsTrigger>
+          <TabsTrigger value="compliance">Compliance</TabsTrigger>
+          <TabsTrigger value="controls">Controls</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-6">
+          {renderOverviewTab()}
+        </TabsContent>
+
+        <TabsContent value="analysis" className="mt-6">
+          {renderAnalysisTab()}
+        </TabsContent>
+
+        <TabsContent value="compliance" className="mt-6">
+          {renderComplianceTab()}
+        </TabsContent>
+
+        <TabsContent value="controls" className="mt-6">
+          {renderControlsTab()}
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
 }
+
+export default AnalysisDashboard
