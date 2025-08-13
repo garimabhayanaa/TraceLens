@@ -6,7 +6,17 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import ssl
 
+# Temporary SSL fix for development
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
+
+os.environ["CURL_CA_BUNDLE"] = ""
 # Import routes
 from routes.analysis import analysis_bp
 
@@ -189,5 +199,5 @@ if __name__ == '__main__':
     app.run(
         debug=True,
         host='0.0.0.0',
-        port=int(os.environ.get('PORT', 5000))
+        port=int(os.environ.get('PORT', 5001))
     )
