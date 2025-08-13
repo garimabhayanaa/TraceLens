@@ -37,24 +37,20 @@ export default function LandingPage() {
             </div>
             <div>
               <span className="text-2xl font-bold text-gray-900">TraceLens</span>
-              <div className="text-xs text-blue-600 font-medium">Enterprise Security</div>
             </div>
           </div>
           <div className="hidden md:flex items-center space-x-6">
             <a href="#features" className="text-gray-600 hover:text-blue-600 transition-colors">Features</a>
+            <a href="#capabilities" className="text-gray-600 hover:text-blue-600 transition-colors">Capabilities</a>
             <a href="#security" className="text-gray-600 hover:text-blue-600 transition-colors">Security</a>
-            <a href="#compliance" className="text-gray-600 hover:text-blue-600 transition-colors">Compliance</a>
             <Link href="/login">
-              <Button variant="outline">Log In</Button>
-            </Link>
-            <Link href="/login">
-              <Button>Get Started</Button>
+              <Button>Log In</Button>
             </Link>
           </div>
           {/* Mobile menu button */}
           <div className="md:hidden">
             <Link href="/login">
-              <Button size="sm">Get Started</Button>
+              <Button size="sm">Log In</Button>
             </Link>
           </div>
         </div>
@@ -72,7 +68,7 @@ export default function LandingPage() {
             </div>
             
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-              AI-Powered Social Media Analysis
+              AI-Powered Personal Data Exposure Analyzer
               <span className="block text-blue-600">with Complete Privacy Protection</span>
             </h1>
             
@@ -130,11 +126,6 @@ export default function LandingPage() {
                       <Shield className="h-3 w-3" />
                       GDPR Compliant
                     </span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <Lock className="h-3 w-3" />
-                      AES-256 Encryption
-                    </span>
                   </div>
                 </div>
               </Card>
@@ -142,22 +133,6 @@ export default function LandingPage() {
 
             {/* Trust indicators */}
             <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-600 mb-12">
-              <div className="flex items-center gap-2">
-                <div className="flex -space-x-1">
-                  <div className="w-6 h-6 bg-blue-500 rounded-full border-2 border-white"></div>
-                  <div className="w-6 h-6 bg-green-500 rounded-full border-2 border-white"></div>
-                  <div className="w-6 h-6 bg-purple-500 rounded-full border-2 border-white"></div>
-                </div>
-                <span>500+ verified users</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="flex">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star key={star} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                <span>4.9/5 rating</span>
-              </div>
               <div className="flex items-center gap-1">
                 <Award className="h-4 w-4 text-blue-500" />
                 <span>Security certified</span>
@@ -191,23 +166,11 @@ export default function LandingPage() {
                 <ul className="text-sm space-y-2 text-red-600">
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Email verification with secure 6-digit codes
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    reCAPTCHA v3 bot protection
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
                     Usage limits (3/day, 1/hour max)
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Real-time IP monitoring & blocking
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Community abuse reporting system
+                    Real-time monitoring
                   </li>
                 </ul>
               </CardContent>
@@ -218,30 +181,18 @@ export default function LandingPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-blue-700">
                   <AlertTriangle className="h-5 w-5" />
-                  Legal & Ethical
+                  Legal
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="text-sm space-y-2 text-blue-600">
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    AI-specific Terms of Service
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
                     Transparent Privacy Policy
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    GDPR & CCPA full compliance
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    AI-powered content moderation
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Legal liability protection
+                    GDPR full compliance
                   </li>
                 </ul>
               </CardContent>
@@ -267,10 +218,6 @@ export default function LandingPage() {
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    XSS & SQL injection prevention
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
                     CSRF protection enabled
                   </li>
                   <li className="flex items-start gap-2">
@@ -293,15 +240,7 @@ export default function LandingPage() {
                 <ul className="text-sm space-y-2 text-purple-600">
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Multi-factor identity verification
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
                     Tiered access level control
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Self-analysis verification
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
@@ -361,10 +300,6 @@ export default function LandingPage() {
                 <ul className="text-sm space-y-2 text-cyan-600">
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Age verification system
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
                     Professional ethics oversight
                   </li>
                   <li className="flex items-start gap-2">
@@ -401,52 +336,6 @@ export default function LandingPage() {
                     <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
                     Advanced data anonymization
                   </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    End-to-end AES-256 encryption
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Client-side processing options
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Secure cryptographic deletion
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* AI Analysis Framework */}
-            <Card className="framework-card border-2 border-yellow-200 bg-yellow-50 hover:border-yellow-300 transition-all duration-300">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-yellow-700">
-                  <Brain className="h-5 w-5" />
-                  AI Analysis
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="text-sm space-y-2 text-yellow-600">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Advanced sentiment analysis
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Behavioral pattern recognition
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Economic indicator analysis
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Mental wellbeing assessment
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Cross-platform correlation
-                  </li>
                 </ul>
               </CardContent>
             </Card>
@@ -454,7 +343,7 @@ export default function LandingPage() {
         </section>
 
         {/* Advanced Analysis Features */}
-        <section id="analysis" className="mb-20">
+        <section id="capabilities" className="mb-20">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               Advanced AI Analysis Capabilities
@@ -575,15 +464,6 @@ export default function LandingPage() {
               <h3 className="text-2xl font-bold text-gray-900 mb-6">Security Standards</h3>
               <div className="space-y-4">
                 <div className="flex items-start space-x-4">
-                  <div className="bg-green-100 rounded-lg p-2">
-                    <Shield className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">AES-256 Encryption</h4>
-                    <p className="text-gray-600 text-sm">End-to-end encryption for all data transmission and storage</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-4">
                   <div className="bg-blue-100 rounded-lg p-2">
                     <Lock className="h-5 w-5 text-blue-600" />
                   </div>
@@ -600,32 +480,6 @@ export default function LandingPage() {
                     <h4 className="font-semibold">Secure Processing</h4>
                     <p className="text-gray-600 text-sm">All analysis performed on anonymized data with secure deletion</p>
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">Compliance Certifications</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white p-4 rounded-xl border-2 border-green-200 text-center">
-                  <div className="text-2xl mb-2">🇪🇺</div>
-                  <div className="font-semibold text-green-700">GDPR</div>
-                  <div className="text-xs text-gray-600">EU Compliant</div>
-                </div>
-                <div className="bg-white p-4 rounded-xl border-2 border-blue-200 text-center">
-                  <div className="text-2xl mb-2">🇺🇸</div>
-                  <div className="font-semibold text-blue-700">CCPA</div>
-                  <div className="text-xs text-gray-600">California Compliant</div>
-                </div>
-                <div className="bg-white p-4 rounded-xl border-2 border-purple-200 text-center">
-                  <div className="text-2xl mb-2">🛡️</div>
-                  <div className="font-semibold text-purple-700">SOC 2</div>
-                  <div className="text-xs text-gray-600">Type II Certified</div>
-                </div>
-                <div className="bg-white p-4 rounded-xl border-2 border-indigo-200 text-center">
-                  <div className="text-2xl mb-2">⚖️</div>
-                  <div className="font-semibold text-indigo-700">ISO 27001</div>
-                  <div className="text-xs text-gray-600">Security Standard</div>
                 </div>
               </div>
             </div>
@@ -707,10 +561,6 @@ export default function LandingPage() {
                 <CheckCircle className="h-4 w-4" />
                 <span>Complete Privacy Protection</span>
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4" />
-                <span>Enterprise Security</span>
-              </div>
             </div>
           </div>
         </section>
@@ -728,29 +578,12 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <span className="text-2xl font-bold text-gray-900">TraceLens</span>
-                  <div className="text-xs text-blue-600 font-medium">Enterprise Security</div>
                 </div>
               </div>
               <p className="text-gray-600 mb-6 leading-relaxed">
                 Enterprise-grade AI analysis with complete privacy protection. 
                 Built with 7 integrated security frameworks for maximum user safety and legal compliance.
               </p>
-              
-              {/* Social Links */}
-              <div className="flex space-x-4">
-                <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors">
-                  <Facebook className="h-5 w-5" />
-                </a>
-                <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors">
-                  <Twitter className="h-5 w-5" />
-                </a>
-                <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors">
-                  <Linkedin className="h-5 w-5" />
-                </a>
-                <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 hover:text-blue-600 transition-colors">
-                  <Github className="h-5 w-5" />
-                </a>
-              </div>
             </div>
 
             {/* Product */}
@@ -765,18 +598,6 @@ export default function LandingPage() {
                 </li>
                 <li>
                   <a href="#features" className="hover:text-blue-600 transition-colors">Features</a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-blue-600 transition-colors">API Documentation</a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-blue-600 transition-colors">Integrations</a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-blue-600 transition-colors">Pricing</a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-blue-600 transition-colors">Enterprise</a>
                 </li>
               </ul>
             </div>
@@ -826,51 +647,6 @@ export default function LandingPage() {
                   <a href="/changelog" className="hover:text-blue-600 transition-colors">Changelog</a>
                 </li>
               </ul>
-
-              {/* Contact Info */}
-              <div className="mt-6 space-y-2">
-                <div className="flex items-center text-sm text-gray-600">
-                  <Mail className="h-4 w-4 mr-2" />
-                  <a href="mailto:support@tracelens.ai" className="hover:text-blue-600">
-                    support@tracelens.ai
-                  </a>
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <Phone className="h-4 w-4 mr-2" />
-                  <a href="tel:+1-555-SECURE" className="hover:text-blue-600">
-                    +1-555-SECURE
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Security Badges */}
-          <div className="border-t border-gray-200 mt-12 pt-8">
-            <div className="text-center mb-6">
-              <h4 className="font-semibold text-gray-900 mb-4">Security & Compliance Certifications</h4>
-              <div className="flex flex-wrap justify-center gap-6">
-                <div className="flex items-center space-x-2 text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg">
-                  <Shield className="h-4 w-4 text-green-600" />
-                  <span>SOC 2 Type II</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg">
-                  <Lock className="h-4 w-4 text-blue-600" />
-                  <span>ISO 27001</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg">
-                  <CheckCircle className="h-4 w-4 text-purple-600" />
-                  <span>GDPR Compliant</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg">
-                  <Award className="h-4 w-4 text-orange-600" />
-                  <span>CCPA Compliant</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg">
-                  <Zap className="h-4 w-4 text-yellow-600" />
-                  <span>NIST Framework</span>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -878,7 +654,7 @@ export default function LandingPage() {
           <div className="border-t border-gray-200 pt-8">
             <div className="flex flex-col md:flex-row justify-between items-center">
               <div className="text-sm text-gray-600 mb-4 md:mb-0">
-                © 2024 TraceLens. All rights reserved. | 
+                © 2025 TraceLens. All rights reserved. |
                 <span className="ml-1">Built with privacy-first principles</span>
               </div>
               
