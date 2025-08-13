@@ -1,0 +1,13 @@
+{
+  "name": "tracelens-backend",
+  "version": "1.0.0",
+  "description": "TraceLens AI Social Media Analyzer Backend with Firebase",
+  "main": "app.py",
+  "scripts": {
+    "start": "python app.py",
+    "dev": "python -m flask run --debug",
+    "test": "python -m pytest"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

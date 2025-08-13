@@ -12,8 +12,8 @@ import threading
 import uuid
 import re
 import requests
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import random
 import string
 

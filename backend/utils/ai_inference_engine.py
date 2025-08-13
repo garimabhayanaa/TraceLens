@@ -3074,4 +3074,37 @@ class AIInferenceEngine:
             abuse_prevention_enabled=abuse_prevention_enabled
         )
 
+def create_ai_inference_engine(config=None):
+    """
+    Factory function to create and return an AIInferenceEngine instance.
+    
+    Args:
+        config (dict, optional): Configuration parameters for the AI engine
+        
+    Returns:
+        AIInferenceEngine: Configured AI inference engine instance
+    """
+    try:
+        # Initialize with default or provided configuration
+        if config is None:
+            config = {
+                'model_name': 'gpt-3.5-turbo',
+                'temperature': 0.7,
+                'max_tokens': 2000,
+                'enable_logging': True
+            }
+        
+        # Create and return the engine instance
+        engine = AIInferenceEngine()
+        
+        # Apply any configuration if needed
+        if hasattr(engine, 'configure'):
+            engine.configure(config)
+            
+        return engine
+        
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to create AI inference engine: {str(e)}")
+        raise
 
