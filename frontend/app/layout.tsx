@@ -1,12 +1,22 @@
-// app/layout.tsx - Server Component (NO 'use client')
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import ClientWrapper from '@/components/layout/ClientWrapper'
 
 const inter = Inter({ subsets: ['latin'] })
 
-// ✅ This works because it's a Server Component
+// ✅ Separate viewport export (required for Next.js 14+)
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#3b82f6' },
+    { media: '(prefers-color-scheme: dark)', color: '#1e40af' },
+  ],
+}
+
+// ✅ Updated metadata export (removed viewport and themeColor)
 export const metadata: Metadata = {
   title: 'LeakPeek - AI Social Media Privacy Analyzer',
   description: 'Advanced AI-powered social media analysis with complete privacy protection, legal compliance, and user control. Features 7 integrated security frameworks including abuse prevention, GDPR/CCPA compliance, and ethical boundaries.',
@@ -62,15 +72,6 @@ export const metadata: Metadata = {
     images: ['/twitter-image.jpg'],
     creator: '@leakpeek',
   },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-  },
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#3b82f6' },
-    { media: '(prefers-color-scheme: dark)', color: '#1e40af' },
-  ],
   manifest: '/manifest.json',
   icons: {
     icon: '/favicon.ico',
@@ -93,7 +94,7 @@ export default function RootLayout({
       <head>
         <meta name="format-detection" content="telephone=no" />
         <meta name="msapplication-TileColor" content="#3b82f6" />
-        <meta name="theme-color" content="#3b82f6" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900">
         {/* Client-side components wrapper */}
@@ -110,3 +111,4 @@ export default function RootLayout({
     </html>
   )
 }
+
