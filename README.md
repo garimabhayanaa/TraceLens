@@ -25,4 +25,4 @@ This project is developed entirely on GitHub with cloud-based deployment.
 - No malicious use permitted
 
 ## Development Status
-🚧 In Development - Minor Project 2024
+🚧 In Development - Minor Project 2025
