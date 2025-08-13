@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 // ✅ This works because it's a Server Component
 export const metadata: Metadata = {
-  title: 'AI Social Media Analyzer - Comprehensive Privacy-First Analysis',
+  title: 'LeakPeek - AI Social Media Privacy Analyzer',
   description: 'Advanced AI-powered social media analysis with complete privacy protection, legal compliance, and user control. Features 7 integrated security frameworks including abuse prevention, GDPR/CCPA compliance, and ethical boundaries.',
   keywords: [
     'AI analysis',
@@ -20,11 +20,14 @@ export const metadata: Metadata = {
     'abuse prevention',
     'ethical AI',
     'data privacy',
-    'secure analysis'
+    'secure analysis',
+    'OSINT mirror',
+    'digital footprint',
+    'privacy awareness'
   ],
-  authors: [{ name: 'AI Social Analyzer Team' }],
-  creator: 'AI Social Analyzer',
-  publisher: 'AI Social Analyzer',
+  authors: [{ name: 'LeakPeek Team' }],
+  creator: 'LeakPeek',
+  publisher: 'LeakPeek',
   robots: {
     index: true,
     follow: true,
@@ -39,25 +42,25 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://your-domain.com',
-    title: 'AI Social Media Analyzer - Privacy-First Analysis',
-    description: 'Comprehensive AI analysis with enterprise-grade security and complete user control',
-    siteName: 'AI Social Media Analyzer',
+    url: 'https://leakpeek.com',
+    title: 'LeakPeek - See What AI Can Infer About You',
+    description: 'Comprehensive AI analysis with enterprise-grade security and complete user control. Your personal OSINT mirror for privacy awareness.',
+    siteName: 'LeakPeek',
     images: [
       {
         url: '/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'AI Social Media Analyzer - Secure Analysis Platform',
+        alt: 'LeakPeek - AI Privacy Analysis Platform',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'AI Social Media Analyzer - Privacy-First Analysis',
-    description: 'Comprehensive AI analysis with enterprise-grade security and complete user control',
+    title: 'LeakPeek - See What AI Can Infer About You',
+    description: 'Your personal OSINT mirror. Discover what patterns AI can extract from your public data.',
     images: ['/twitter-image.jpg'],
-    creator: '@aisocialanalyzer',
+    creator: '@leakpeek',
   },
   viewport: {
     width: 'device-width',
@@ -77,7 +80,7 @@ export const metadata: Metadata = {
   category: 'technology',
   classification: 'AI Analysis Platform',
   referrer: 'origin-when-cross-origin',
-  metadataBase: new URL('https://your-domain.com'),
+  metadataBase: new URL('https://leakpeek.com'),
 }
 
 export default function RootLayout({
@@ -86,11 +89,23 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} antialiased`}>
+    <html lang="en" className={inter.className}>
+      <head>
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="msapplication-TileColor" content="#3b82f6" />
+        <meta name="theme-color" content="#3b82f6" />
+      </head>
+      <body className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900">
+        {/* Client-side components wrapper */}
         <ClientWrapper>
           {children}
         </ClientWrapper>
+
+        {/* Background elements */}
+        <div className="fixed inset-0 -z-10 overflow-hidden">
+          <div className="absolute -top-1/2 -right-1/2 w-full h-full bg-gradient-to-bl from-blue-100/20 to-transparent rounded-full blur-3xl" />
+          <div className="absolute -bottom-1/2 -left-1/2 w-full h-full bg-gradient-to-tr from-purple-100/20 to-transparent rounded-full blur-3xl" />
+        </div>
       </body>
     </html>
   )

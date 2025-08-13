@@ -1,4 +1,3 @@
-# app.py
 import os
 import logging
 from datetime import datetime
@@ -17,6 +16,7 @@ else:
     ssl._create_default_https_context = _create_unverified_https_context
 
 os.environ["CURL_CA_BUNDLE"] = ""
+
 # Import routes
 from routes.analysis import analysis_bp
 
@@ -29,6 +29,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
 logger = logging.getLogger(__name__)
 
 # Create Flask app
@@ -38,7 +39,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-production')
 
 # CORS Configuration
-CORS(app, 
+CORS(app,
      origins=['http://localhost:3000', 'https://your-domain.com'],
      supports_credentials=True,
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -47,13 +48,14 @@ CORS(app,
 # Rate Limiting
 limiter = Limiter(
     app=app,
-    key_func=get_remote_address,  # Keep only one key_func
+    key_func=get_remote_address,
     default_limits=["200 per hour", "50 per minute"],
     storage_uri="memory://",
 )
 
 # Register blueprints
 app.register_blueprint(analysis_bp, url_prefix='/api/analysis')
+
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])
@@ -64,7 +66,6 @@ def health_check():
         db = firebase_config.get_firestore_client()
         # Simple connectivity test
         test_collection = db.collection('health_check')
-        
         return jsonify({
             'status': 'healthy',
             'timestamp': datetime.utcnow().isoformat(),
@@ -73,7 +74,6 @@ def health_check():
             'firebase': 'connected',
             'environment': os.environ.get('FLASK_ENV', 'development')
         }), 200
-        
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return jsonify({
@@ -81,6 +81,7 @@ def health_check():
             'timestamp': datetime.utcnow().isoformat(),
             'error': str(e)
         }), 500
+
 
 # Root endpoint
 @app.route('/', methods=['GET'])
@@ -96,13 +97,14 @@ def root():
             'health': '/health',
             'analysis': '/api/analysis',
             'start_analysis': '/api/analysis/start',
-            'analysis_status': '/api/analysis/status/<session_id>',
-            'analysis_results': '/api/analysis/results/<session_id>',
+            'analysis_status': '/api/analysis/status/',
+            'analysis_results': '/api/analysis/results/',
             'analysis_history': '/api/analysis/history'
         },
         'documentation': 'https://tracelens-docs.com/api/v2',
         'support': 'support@tracelens.ai'
     }), 200
+
 
 # User profile endpoint
 @app.route('/api/user/profile', methods=['GET'])
@@ -110,13 +112,13 @@ def root():
 def get_user_profile():
     """Get user profile information"""
     from middleware.firebase_auth import verify_firebase_token, get_current_user
-    
+
     @verify_firebase_token
     def _get_profile():
         try:
             user = get_current_user()
             firestore_user = user['firestore_user']
-            
+
             return jsonify({
                 'success': True,
                 'user': {
@@ -132,12 +134,13 @@ def get_user_profile():
                     'last_analysis': firestore_user.get('last_analysis')
                 }
             }), 200
-            
+
         except Exception as e:
             logger.error(f"Profile retrieval error: {str(e)}")
             return jsonify({'error': 'Failed to get user profile'}), 500
-    
+
     return _get_profile()
+
 
 # Error handlers
 @app.errorhandler(404)
@@ -148,6 +151,7 @@ def not_found(error):
         'available_endpoints': ['/health', '/api/analysis', '/api/user/profile']
     }), 404
 
+
 @app.errorhandler(500)
 def internal_error(error):
     logger.error(f"Internal server error: {str(error)}")
@@ -155,6 +159,7 @@ def internal_error(error):
         'error': 'Internal server error',
         'message': 'An unexpected error occurred'
     }), 500
+
 
 @app.errorhandler(429)
 def ratelimit_handler(e):
@@ -164,12 +169,13 @@ def ratelimit_handler(e):
         'retry_after': str(e.retry_after)
     }), 429
 
+
 # Background cleanup task
 def setup_cleanup_scheduler():
     """Setup background cleanup for expired sessions"""
     import threading
     import time
-    
+
     def cleanup_task():
         while True:
             try:
@@ -180,10 +186,11 @@ def setup_cleanup_scheduler():
             except Exception as e:
                 logger.error(f"Cleanup task error: {str(e)}")
                 time.sleep(3600)
-    
+
     cleanup_thread = threading.Thread(target=cleanup_task, daemon=True)
     cleanup_thread.start()
     logger.info("Background cleanup scheduler started")
+
 
 # Initialize background tasks
 setup_cleanup_scheduler()
@@ -195,9 +202,10 @@ if __name__ == '__main__':
     logger.info("🛡️ Security Frameworks: Active")
     logger.info("🤖 AI Analysis Service: Ready")
     logger.info("✅ Backend ready for frontend connection")
-    
+
     app.run(
         debug=True,
         host='0.0.0.0',
         port=int(os.environ.get('PORT', 5001))
     )
+
