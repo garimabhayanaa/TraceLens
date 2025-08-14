@@ -607,46 +607,18 @@ export default function LandingPage() {
               <h3 className="font-semibold text-gray-900 mb-4">Legal & Security</h3>
               <ul className="space-y-3 text-sm text-gray-600">
                 <li>
-                  <a href="/privacy-policy" className="hover:text-blue-600 transition-colors">Privacy Policy</a>
+                  <a href="/privacy" className="hover:text-blue-600 transition-colors">Privacy Policy</a>
                 </li>
                 <li>
-                  <a href="/terms-of-service" className="hover:text-blue-600 transition-colors">Terms of Service</a>
+                  <a href="/terms" className="hover:text-blue-600 transition-colors">Terms of Service</a>
                 </li>
                 <li>
                   <a href="/security" className="hover:text-blue-600 transition-colors">Security Overview</a>
                 </li>
-                <li>
-                  <a href="/compliance" className="hover:text-blue-600 transition-colors">Compliance Center</a>
-                </li>
-                <li>
-                  <a href="/data-protection" className="hover:text-blue-600 transition-colors">Data Protection</a>
-                </li>
-                <li>
-                  <a href="/report-abuse" className="hover:text-blue-600 transition-colors">Report Abuse</a>
-                </li>
               </ul>
             </div>
 
-            {/* Support & Contact */}
             <div>
-              <h3 className="font-semibold text-gray-900 mb-4">Support & Contact</h3>
-              <ul className="space-y-3 text-sm text-gray-600">
-                <li>
-                  <a href="/help" className="hover:text-blue-600 transition-colors">Help Center</a>
-                </li>
-                <li>
-                  <a href="/contact" className="hover:text-blue-600 transition-colors">Contact Support</a>
-                </li>
-                <li>
-                  <a href="/status" className="hover:text-blue-600 transition-colors">System Status</a>
-                </li>
-                <li>
-                  <a href="/blog" className="hover:text-blue-600 transition-colors">Blog</a>
-                </li>
-                <li>
-                  <a href="/changelog" className="hover:text-blue-600 transition-colors">Changelog</a>
-                </li>
-              </ul>
             </div>
           </div>
 

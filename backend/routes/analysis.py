@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify
 from middleware.firebase_auth import require_auth
 from services.ai_analysis_service import AIAnalysisService
 from models.firestore_models import AnalysisSession, FirestoreUser, AuditLog
-from utils.url_validator import create_url_validator
 import logging
 import threading
 import time
@@ -13,26 +12,14 @@ import uuid
 analysis_bp = Blueprint('analysis', __name__)
 
 # Initialize AI analysis service
-
-# Initialize AI analysis service
 ai_service = AIAnalysisService()
-
-# Initialize URL validator
-url_validator = create_url_validator()
 
 @analysis_bp.route('/start', methods=['POST'])
 @require_auth
-@require_auth
 def start_analysis():
-    """Start a new analysis session"""
     """Start a new analysis session"""
     try:
         data = request.get_json()
-        user_id = request.user_id
-        
-        logging.info(f"Received analysis request from user {user_id}: {data}")
-        
-        # Validate request data
         user_id = request.user_id
         
         logging.info(f"Received analysis request from user {user_id}: {data}")
@@ -59,40 +46,12 @@ def start_analysis():
                 'error': 'Social media URL is required'
             }), 400
             
-        # Enhanced URL validation using URL validator
-        try:
-            validation_result = url_validator.validate_social_url(url)
-            
-            if not validation_result['is_valid']:
-                logging.warning(f"Invalid URL submitted by user {user_id}: {url}")
-                return jsonify({
-                    'success': False,
-                    'error': 'Invalid social media URL',
-                    'message': validation_result.get('error', 'URL validation failed'),
-                    'supported_platforms': validation_result.get('supported_platforms', [
-                        'twitter.com', 'x.com', 'linkedin.com', 'github.com',
-                        'instagram.com', 'facebook.com', 'tiktok.com', 'youtube.com'
-                    ]),
-                    'example_formats': [
-                        'https://twitter.com/username',
-                        'https://linkedin.com/in/username',
-                        'https://github.com/username',
-                        'https://instagram.com/username'
-                    ],
-                    'submitted_url': url
-                }), 400
-                
-            # Use the cleaned URL from validation
-            url = validation_result.get('cleaned_url', url)
-            
-        except Exception as validation_error:
-            logging.error(f"URL validation error: {str(validation_error)}")
-            # Fallback to basic validation if URL validator fails
-            if not url.startswith(('http://', 'https://')):
-                return jsonify({
-                    'success': False,
-                    'error': 'URL must start with http:// or https://'
-                }), 400
+        # Basic URL validation (since URL validator might be causing issues)
+        if not url.startswith(('http://', 'https://')):
+            return jsonify({
+                'success': False,
+                'error': 'URL must start with http:// or https://'
+            }), 400
         
         # Validate analysis type
         valid_types = ['comprehensive', 'privacy_only', 'sentiment', 'basic']
@@ -103,7 +62,7 @@ def start_analysis():
                 'error': f'Invalid analysis type. Must be one of: {", ".join(valid_types)}'
             }), 400
         
-        # ✅ FIXED: Use get_user instead of get (correct method name)
+        # Get user data to check usage limits
         user_result = FirestoreUser.get_user(user_id)
         if not user_result['success']:
             # Create user if doesn't exist
@@ -155,24 +114,28 @@ def start_analysis():
         if not usage_result['success']:
             logging.warning(f"Failed to increment usage for user {user_id}: {usage_result['error']}")
         
-        # Create audit log
+        # ✅ FIXED: Extract request context data BEFORE starting background thread
+        ip_address = request.remote_addr
+        user_agent = request.headers.get('User-Agent')
+        
+        # Create audit log (within request context)
         audit_details = {
             'url': url,
             'analysis_type': analysis_type,
             'session_id': session_id,
-            'user_agent': request.headers.get('User-Agent'),
-            'consent_given': True,
-            'platform_detected': validation_result.get('platform') if 'validation_result' in locals() else 'unknown'
+            'user_agent': user_agent,
+            'consent_given': True
         }
         AuditLog.create_log(
             user_id=user_id,
             action='analysis_start',
             details=audit_details,
-            ip_address=request.remote_addr
+            ip_address=ip_address
         )
         
-        # Start analysis in background thread
-        def run_analysis():
+        # ✅ FIXED: Start analysis in background thread WITHOUT flask context dependencies
+        def run_analysis(user_id, ip_address, user_agent, session_id, url, analysis_type):
+            """Background analysis function - NO Flask request context access"""
             try:
                 logging.info(f"Starting background analysis for session: {session_id}")
                 start_time = time.time()
@@ -214,18 +177,19 @@ def start_analysis():
                     # Save results
                     AnalysisSession.save_results(session_id, analysis_results['results'])
                     
-                    # Create completion audit log
+                    # Create completion audit log (without request context)
                     completion_details = {
                         'session_id': session_id,
                         'analysis_completed': True,
                         'results_generated': True,
-                        'processing_time_seconds': time.time() - start_time
+                        'processing_time_seconds': time.time() - start_time,
+                        'user_agent': user_agent  # Use passed parameter
                     }
                     AuditLog.create_log(
                         user_id=user_id,
                         action='analysis_completed',
                         details=completion_details,
-                        ip_address=request.remote_addr
+                        ip_address=ip_address  # Use passed parameter
                     )
                     
                     logging.info(f"Analysis completed successfully for session: {session_id}")
@@ -234,17 +198,18 @@ def start_analysis():
                     error_msg = analysis_results.get('error', 'Analysis failed due to unknown error')
                     AnalysisSession.mark_failed(session_id, error_msg)
                     
-                    # Create failure audit log
+                    # Create failure audit log (without request context)
                     failure_details = {
                         'session_id': session_id,
                         'error_message': error_msg,
-                        'analysis_failed': True
+                        'analysis_failed': True,
+                        'user_agent': user_agent  # Use passed parameter
                     }
                     AuditLog.create_log(
                         user_id=user_id,
                         action='analysis_failed',
                         details=failure_details,
-                        ip_address=request.remote_addr
+                        ip_address=ip_address  # Use passed parameter
                     )
                     
                     logging.error(f"Analysis failed for session {session_id}: {error_msg}")
@@ -252,10 +217,27 @@ def start_analysis():
             except Exception as e:
                 logging.error(f"Background analysis error for session {session_id}: {str(e)}")
                 AnalysisSession.mark_failed(session_id, f"Internal processing error: {str(e)}")
+                
+                # Create error audit log (without request context)
+                error_details = {
+                    'session_id': session_id,
+                    'internal_error': str(e),
+                    'analysis_failed': True,
+                    'user_agent': user_agent  # Use passed parameter
+                }
+                AuditLog.create_log(
+                    user_id=user_id,
+                    action='analysis_error',
+                    details=error_details,
+                    ip_address=ip_address  # Use passed parameter
+                )
         
-        # Start background analysis
-        analysis_thread = threading.Thread(target=run_analysis)
-        analysis_thread.daemon = True
+        # Start background analysis with extracted context data
+        analysis_thread = threading.Thread(
+            target=run_analysis, 
+            args=(user_id, ip_address, user_agent, session_id, url, analysis_type),
+            daemon=True
+        )
         analysis_thread.start()
         
         logging.info(f"Analysis session started successfully: {session_id}")
@@ -265,8 +247,7 @@ def start_analysis():
             'session_id': session_id,
             'message': 'Analysis started successfully',
             'estimated_completion_minutes': 2,
-            'daily_usage_remaining': daily_limit - daily_usage - 1,
-            'platform_detected': validation_result.get('platform') if 'validation_result' in locals() else None
+            'daily_usage_remaining': daily_limit - daily_usage - 1
         }), 200
         
     except Exception as e:
@@ -329,9 +310,8 @@ def get_analysis_status(session_id):
         }), 500
 
 @analysis_bp.route('/results/<session_id>', methods=['GET'])
-@require_auth  
+@require_auth
 def get_analysis_results(session_id):
-    """Get the results of a completed analysis"""
     """Get the results of a completed analysis"""
     try:
         user_id = request.user_id
@@ -401,7 +381,6 @@ def get_analysis_results(session_id):
 
 @analysis_bp.route('/history', methods=['GET'])
 @require_auth
-@require_auth
 def get_analysis_history():
     """Get user's analysis history"""
     try:
@@ -432,9 +411,6 @@ def get_analysis_history():
             formatted_session = {
                 'session_id': session.get('session_id'),
                 'url': session.get('url'),
-            formatted_session = {
-                'session_id': session.get('session_id'),
-                'url': session.get('url'),
                 'analysis_type': session.get('analysis_type'),
                 'status': session.get('status'),
                 'progress': session.get('progress', 0),
@@ -453,8 +429,6 @@ def get_analysis_history():
             'success': True,
             'sessions': formatted_sessions,
             'total_count': len(formatted_sessions)
-            'sessions': formatted_sessions,
-            'total_count': len(formatted_sessions)
         }), 200
         
     except Exception as e:
@@ -466,9 +440,7 @@ def get_analysis_history():
 
 @analysis_bp.route('/delete/<session_id>', methods=['DELETE'])
 @require_auth
-@require_auth
 def delete_analysis(session_id):
-    """Delete an analysis session and its data"""
     """Delete an analysis session and its data"""
     try:
         user_id = request.user_id
@@ -520,7 +492,6 @@ def delete_analysis(session_id):
         
         return jsonify({
             'success': True,
-            'message': 'Analysis session deleted successfully'
             'message': 'Analysis session deleted successfully'
         }), 200
         

@@ -1,14 +1,20 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from google.cloud import firestore
 from config.firebase_config import db
 import uuid
-import json
-from google.cloud import firestore
-from config.firebase_config import db
-import uuid
-import json
 from typing import Dict, List, Any, Optional
+
+def normalize_datetime(dt):
+    """Helper function to normalize datetime objects for comparison"""
+    if dt is None:
+        return None
+    if isinstance(dt, datetime):
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        else:
+            return dt
+    return dt
 
 class FirestoreUser:
     """User model for Firestore operations"""
@@ -22,14 +28,14 @@ class FirestoreUser:
                 'email': email,
                 'display_name': display_name,
                 'subscription_tier': 'free',
-                'daily_usage': 0,
+                'daily_usage': 0,  # ✅ FIXED: Initialize with 0
                 'lifetime_analysis_count': 0,
                 'privacy_level': 'standard',
                 'created_at': firestore.SERVER_TIMESTAMP,
                 'last_login': firestore.SERVER_TIMESTAMP,
                 'preferences': {
                     'email_notifications': True,
-                    'data_retention_days': 1,  # 24 hours
+                    'data_retention_days': 1,
                     'analysis_history_visible': True
                 },
                 'usage_limits': {
@@ -44,7 +50,6 @@ class FirestoreUser:
                 'last_usage_reset': firestore.SERVER_TIMESTAMP
             }
             
-            # Create user document
             db.collection('users').document(user_id).set(user_data)
             
             logging.info(f"User created successfully: {user_id}")
@@ -63,6 +68,13 @@ class FirestoreUser:
             
             if user_doc.exists:
                 user_data = user_doc.to_dict()
+                
+                # ✅ FIXED: Ensure daily_usage field exists
+                if 'daily_usage' not in user_data:
+                    user_data['daily_usage'] = 0
+                    # Update the document to include the missing field
+                    user_ref.update({'daily_usage': 0})
+                
                 logging.info(f"User retrieved successfully: {user_id}")
                 return {'success': True, 'user': user_data}
             else:
@@ -74,37 +86,18 @@ class FirestoreUser:
             return {'success': False, 'error': str(e)}
     
     @staticmethod
-    def update_user(user_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update user data in Firestore"""
-        try:
-            user_ref = db.collection('users').document(user_id)
-            
-            # Add timestamp for last update
-            update_data['updated_at'] = firestore.SERVER_TIMESTAMP
-            
-            # Update user document
-            user_ref.update(update_data)
-            
-            logging.info(f"User updated successfully: {user_id}")
-            return {'success': True}
-            
-        except Exception as e:
-            logging.error(f"Error updating user {user_id}: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    @staticmethod
     def increment_usage(user_id: str) -> Dict[str, Any]:
         """Increment user's daily usage count"""
         try:
             user_ref = db.collection('users').document(user_id)
             
-            # Use atomic transaction to increment counters
             @firestore.transactional
             def increment_counters(transaction, user_ref):
                 user_doc = user_ref.get(transaction=transaction)
                 if user_doc.exists:
-                    current_usage = user_doc.get('daily_usage', 0)
-                    lifetime_count = user_doc.get('lifetime_analysis_count', 0)
+                    user_data = user_doc.to_dict()
+                    current_usage = user_data.get('daily_usage', 0)  # ✅ Default to 0 if missing
+                    lifetime_count = user_data.get('lifetime_analysis_count', 0)
                     
                     transaction.update(user_ref, {
                         'daily_usage': current_usage + 1,
@@ -125,25 +118,6 @@ class FirestoreUser:
         except Exception as e:
             logging.error(f"Error incrementing usage for {user_id}: {e}")
             return {'success': False, 'error': str(e)}
-    
-    @staticmethod
-    def reset_daily_usage(user_id: str) -> Dict[str, Any]:
-        """Reset user's daily usage count"""
-        try:
-            user_ref = db.collection('users').document(user_id)
-            user_ref.update({
-                'daily_usage': 0,
-                'last_usage_reset': firestore.SERVER_TIMESTAMP
-                'daily_usage': 0,
-                'last_usage_reset': firestore.SERVER_TIMESTAMP
-            })
-            
-            logging.info(f"Daily usage reset for user: {user_id}")
-            return {'success': True}
-            
-        except Exception as e:
-            logging.error(f"Error resetting daily usage for {user_id}: {e}")
-            return {'success': False, 'error': str(e)}
 
 class AnalysisSession:
     """Analysis session model for Firestore operations"""
@@ -163,13 +137,11 @@ class AnalysisSession:
                 'progress': 0,
                 'created_at': firestore.SERVER_TIMESTAMP,
                 'updated_at': firestore.SERVER_TIMESTAMP,
-                'expires_at': datetime.utcnow() + timedelta(hours=24),  # 24-hour TTL
+                'expires_at': datetime.now(timezone.utc) + timedelta(hours=24),
                 'results': None,
                 'error_message': None,
                 'processing_steps': [],
                 'metadata': {
-                    'ip_address': None,  # Set by middleware
-                    'user_agent': None,  # Set by middleware
                     'analysis_version': '1.0.0',
                     'frameworks_used': [
                         'privacy_framework',
@@ -186,7 +158,6 @@ class AnalysisSession:
                 }
             }
             
-            # Create session document with TTL
             session_ref = db.collection('analysis_sessions').document(session_id)
             session_ref.set(session_data)
             
@@ -198,69 +169,25 @@ class AnalysisSession:
             return {'success': False, 'error': str(e)}
     
     @staticmethod
-    def get_session(session_id: str) -> Dict[str, Any]:
-        """Get analysis session data"""
-        try:
-            session_ref = db.collection('analysis_sessions').document(session_id)
-            session_doc = session_ref.get()
-            
-            if session_doc.exists:
-                session_data = session_doc.to_dict()
-                
-                # Check if session has expired
-                if session_data.get('expires_at') and session_data['expires_at'] < datetime.utcnow():
-                    logging.warning(f"Session expired: {session_id}")
-                    return {'success': False, 'error': 'Session expired'}
-                
-                return {'success': True, 'session': session_data}
-            else:
-                logging.warning(f"Session not found: {session_id}")
-                return {'success': False, 'error': 'Session not found'}
-                
-        except Exception as e:
-            logging.error(f"Error getting session {session_id}: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    @staticmethod
-    def update_session(session_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update analysis session"""
-        try:
-            session_ref = db.collection('analysis_sessions').document(session_id)
-            
-            # Add timestamp for last update
-            update_data['updated_at'] = firestore.SERVER_TIMESTAMP
-            
-            # Update session document
-            session_ref.update(update_data)
-            
-            logging.info(f"Session updated: {session_id}")
-            return {'success': True}
-            
-        except Exception as e:
-            logging.error(f"Error updating session {session_id}: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    @staticmethod
     def update_progress(session_id: str, progress: int, status: str, step_description: str = None) -> Dict[str, Any]:
-        """Update analysis progress"""
+        """Update analysis progress - ✅ FIXED: Safe for background threads"""
         try:
             session_ref = db.collection('analysis_sessions').document(session_id)
             
+            # ✅ FIXED: Use datetime instead of SERVER_TIMESTAMP in background threads
             update_data = {
                 'progress': progress,
                 'status': status,
-                'updated_at': firestore.SERVER_TIMESTAMP
+                'updated_at': datetime.now(timezone.utc)  # Use UTC datetime instead of SERVER_TIMESTAMP
             }
             
-            # Add processing step if provided
             if step_description:
-                # Get current session to append to processing steps
                 session_doc = session_ref.get()
                 if session_doc.exists:
-                    current_steps = session_doc.get('processing_steps', [])
+                    current_steps = session_doc.to_dict().get('processing_steps', [])
                     current_steps.append({
                         'step': step_description,
-                        'timestamp': firestore.SERVER_TIMESTAMP,
+                        'timestamp': datetime.now(timezone.utc),  # Use UTC datetime
                         'progress': progress
                     })
                     update_data['processing_steps'] = current_steps
@@ -284,8 +211,8 @@ class AnalysisSession:
                 'results': results,
                 'status': 'completed',
                 'progress': 100,
-                'completed_at': firestore.SERVER_TIMESTAMP,
-                'updated_at': firestore.SERVER_TIMESTAMP
+                'completed_at': datetime.now(timezone.utc),  # Use UTC datetime
+                'updated_at': datetime.now(timezone.utc)     # Use UTC datetime
             }
             
             session_ref.update(update_data)
@@ -306,8 +233,8 @@ class AnalysisSession:
             update_data = {
                 'status': 'failed',
                 'error_message': error_message,
-                'failed_at': firestore.SERVER_TIMESTAMP,
-                'updated_at': firestore.SERVER_TIMESTAMP
+                'failed_at': datetime.now(timezone.utc),    # Use UTC datetime
+                'updated_at': datetime.now(timezone.utc)    # Use UTC datetime
             }
             
             session_ref.update(update_data)
@@ -320,10 +247,38 @@ class AnalysisSession:
             return {'success': False, 'error': str(e)}
     
     @staticmethod
+    def get_session(session_id: str) -> Dict[str, Any]:
+        """Get analysis session data"""
+        try:
+            session_ref = db.collection('analysis_sessions').document(session_id)
+            session_doc = session_ref.get()
+            
+            if session_doc.exists:
+                session_data = session_doc.to_dict()
+                
+                # Handle timezone-aware datetime comparison
+                expires_at = session_data.get('expires_at')
+                if expires_at:
+                    expires_at = normalize_datetime(expires_at)
+                    current_time = normalize_datetime(datetime.now(timezone.utc))
+                    
+                    if expires_at < current_time:
+                        logging.warning(f"Session expired: {session_id}")
+                        return {'success': False, 'error': 'Session expired'}
+                
+                return {'success': True, 'session': session_data}
+            else:
+                logging.warning(f"Session not found: {session_id}")
+                return {'success': False, 'error': 'Session not found'}
+                
+        except Exception as e:
+            logging.error(f"Error getting session {session_id}: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    @staticmethod
     def get_user_sessions(user_id: str, limit: int = 10) -> Dict[str, Any]:
         """Get analysis sessions for a specific user"""
         try:
-            # Use the where() method properly with Firestore
             sessions_ref = db.collection('analysis_sessions')
             query = sessions_ref.where('user_id', '==', user_id).limit(limit)
             
@@ -333,7 +288,6 @@ class AnalysisSession:
                 session_data['session_id'] = doc.id
                 sessions.append(session_data)
             
-            # Sort in Python instead of Firestore (to avoid index requirements)
             sessions.sort(key=lambda x: x.get('created_at', datetime.min), reverse=True)
             
             logging.info(f"Retrieved {len(sessions)} sessions for user: {user_id}")
@@ -359,14 +313,14 @@ class AnalysisSession:
     
     @staticmethod
     def cleanup_expired_sessions() -> Dict[str, Any]:
-        """Clean up expired sessions (called by background task)"""
+        """Clean up expired sessions"""
         try:
-            cutoff_time = datetime.utcnow() - timedelta(hours=24)
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
             
-            # Query expired sessions
+            # ✅ FIXED: Use where() method instead of filter()
             expired_sessions = db.collection('analysis_sessions').where(
                 'created_at', '<', cutoff_time
-            ).limit(100)  # Process in batches
+            ).limit(100)
             
             deleted_count = 0
             for session_doc in expired_sessions.stream():
@@ -385,7 +339,7 @@ class AuditLog:
     
     @staticmethod
     def create_log(user_id: str, action: str, details: Dict[str, Any], ip_address: str = None) -> Dict[str, Any]:
-        """Create audit log entry"""
+        """Create audit log entry - ✅ FIXED: Safe for background threads"""
         try:
             log_id = str(uuid.uuid4())
             
@@ -395,7 +349,7 @@ class AuditLog:
                 'action': action,
                 'details': details,
                 'ip_address': ip_address,
-                'timestamp': firestore.SERVER_TIMESTAMP,
+                'timestamp': datetime.now(timezone.utc),  # Use UTC datetime instead of SERVER_TIMESTAMP
                 'user_agent': details.get('user_agent'),
                 'session_id': details.get('session_id'),
                 'compliance_flags': {
@@ -405,7 +359,6 @@ class AuditLog:
                 }
             }
             
-            # Create log document
             db.collection('audit_logs').document(log_id).set(log_data)
             
             logging.info(f"Audit log created: {action} for user: {user_id}")
@@ -414,28 +367,6 @@ class AuditLog:
         except Exception as e:
             logging.error(f"Error creating audit log: {e}")
             return {'success': False, 'error': str(e)}
-    
-    @staticmethod
-    def get_user_logs(user_id: str, limit: int = 50) -> Dict[str, Any]:
-        """Get audit logs for a specific user"""
-        try:
-            logs_ref = db.collection('audit_logs')
-            query = logs_ref.where('user_id', '==', user_id).limit(limit)
-            
-            logs = []
-            for doc in query.stream():
-                log_data = doc.to_dict()
-                log_data['log_id'] = doc.id
-                logs.append(log_data)
-            
-            # Sort by timestamp in Python
-            logs.sort(key=lambda x: x.get('timestamp', datetime.min), reverse=True)
-            
-            return {'success': True, 'logs': logs}
-            
-        except Exception as e:
-            logging.error(f"Error getting audit logs for {user_id}: {e}")
-            return {'success': False, 'error': str(e), 'logs': []}
 
 # Export all model classes
 __all__ = ['FirestoreUser', 'AnalysisSession', 'AuditLog']
