@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { auth } from './firebase';
 import toast from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 // API Configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -11,6 +12,7 @@ const apiClient: AxiosInstance = axios.create({
   timeout: 120000, // 2 minutes timeout for analysis requests
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     'Accept': 'application/json',
   },
 });
@@ -26,14 +28,19 @@ apiClient.interceptors.request.use(
         console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
       } else {
         console.warn('No authenticated user found for API request');
+        console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+      } else {
+        console.warn('No authenticated user found for API request');
       }
     } catch (error) {
       console.error('Error getting Firebase token:', error);
+      toast.error('Authentication error. Please sign in again.');
       toast.error('Authentication error. Please sign in again.');
     }
     return config;
   },
   (error) => {
+    console.error('Request interceptor error:', error);
     console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
@@ -41,6 +48,10 @@ apiClient.interceptors.request.use(
 
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
+  (response: AxiosResponse) => {
+    console.log(`API Response: ${response.status} ${response.config.url}`);
+    return response;
+  },
   (response: AxiosResponse) => {
     console.log(`API Response: ${response.status} ${response.config.url}`);
     return response;
@@ -108,8 +119,38 @@ export const apiService = {
       console.error('Health check failed:', error);
       throw error;
     }
+    try {
+      const response = await apiClient.get('/health');
+      return response.data;
+    } catch (error) {
+      console.error('Health check failed:', error);
+      throw error;
+    }
   },
 
+  // User profile endpoints
+  user: {
+    // Get user profile
+    getProfile: async () => {
+      try {
+        const response = await apiClient.get('/api/user/profile');
+        return response.data;
+      } catch (error) {
+        console.error('Failed to get user profile:', error);
+        throw error;
+      }
+    },
+
+    // Update user profile
+    updateProfile: async (profileData: any) => {
+      try {
+        const response = await apiClient.put('/api/user/profile', profileData);
+        return response.data;
+      } catch (error) {
+        console.error('Failed to update user profile:', error);
+        throw error;
+      }
+    },
   // User profile endpoints
   user: {
     // Get user profile

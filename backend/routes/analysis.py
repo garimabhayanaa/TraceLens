@@ -13,6 +13,8 @@ import uuid
 analysis_bp = Blueprint('analysis', __name__)
 
 # Initialize AI analysis service
+
+# Initialize AI analysis service
 ai_service = AIAnalysisService()
 
 # Initialize URL validator
@@ -20,10 +22,17 @@ url_validator = create_url_validator()
 
 @analysis_bp.route('/start', methods=['POST'])
 @require_auth
+@require_auth
 def start_analysis():
+    """Start a new analysis session"""
     """Start a new analysis session"""
     try:
         data = request.get_json()
+        user_id = request.user_id
+        
+        logging.info(f"Received analysis request from user {user_id}: {data}")
+        
+        # Validate request data
         user_id = request.user_id
         
         logging.info(f"Received analysis request from user {user_id}: {data}")
@@ -323,6 +332,7 @@ def get_analysis_status(session_id):
 @require_auth  
 def get_analysis_results(session_id):
     """Get the results of a completed analysis"""
+    """Get the results of a completed analysis"""
     try:
         user_id = request.user_id
         
@@ -391,6 +401,7 @@ def get_analysis_results(session_id):
 
 @analysis_bp.route('/history', methods=['GET'])
 @require_auth
+@require_auth
 def get_analysis_history():
     """Get user's analysis history"""
     try:
@@ -421,6 +432,9 @@ def get_analysis_history():
             formatted_session = {
                 'session_id': session.get('session_id'),
                 'url': session.get('url'),
+            formatted_session = {
+                'session_id': session.get('session_id'),
+                'url': session.get('url'),
                 'analysis_type': session.get('analysis_type'),
                 'status': session.get('status'),
                 'progress': session.get('progress', 0),
@@ -439,6 +453,8 @@ def get_analysis_history():
             'success': True,
             'sessions': formatted_sessions,
             'total_count': len(formatted_sessions)
+            'sessions': formatted_sessions,
+            'total_count': len(formatted_sessions)
         }), 200
         
     except Exception as e:
@@ -450,7 +466,9 @@ def get_analysis_history():
 
 @analysis_bp.route('/delete/<session_id>', methods=['DELETE'])
 @require_auth
+@require_auth
 def delete_analysis(session_id):
+    """Delete an analysis session and its data"""
     """Delete an analysis session and its data"""
     try:
         user_id = request.user_id
@@ -502,6 +520,7 @@ def delete_analysis(session_id):
         
         return jsonify({
             'success': True,
+            'message': 'Analysis session deleted successfully'
             'message': 'Analysis session deleted successfully'
         }), 200
         

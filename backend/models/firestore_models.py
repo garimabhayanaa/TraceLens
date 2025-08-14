@@ -4,6 +4,10 @@ from google.cloud import firestore
 from config.firebase_config import db
 import uuid
 import json
+from google.cloud import firestore
+from config.firebase_config import db
+import uuid
+import json
 from typing import Dict, List, Any, Optional
 
 class FirestoreUser:
@@ -128,6 +132,8 @@ class FirestoreUser:
         try:
             user_ref = db.collection('users').document(user_id)
             user_ref.update({
+                'daily_usage': 0,
+                'last_usage_reset': firestore.SERVER_TIMESTAMP
                 'daily_usage': 0,
                 'last_usage_reset': firestore.SERVER_TIMESTAMP
             })
