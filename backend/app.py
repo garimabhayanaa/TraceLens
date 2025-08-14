@@ -21,7 +21,7 @@ os.environ["CURL_CA_BUNDLE"] = ""
 from routes.analysis import analysis_bp
 
 # Import models for initialization
-from config.firebase_config import firebase_config
+from config.firebase_config import db
 from models.firestore_models import AnalysisSession
 
 # Configure logging

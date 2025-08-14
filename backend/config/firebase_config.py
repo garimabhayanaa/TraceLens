@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import os
 import json
 import logging
@@ -110,3 +111,42 @@ def is_firebase_available():
     """Check if Firebase services are available"""
     return firebase_config.is_connected()
 
+=======
+import firebase_admin
+from firebase_admin import credentials, firestore
+import os
+import logging
+
+def initialize_firebase():
+    """Initialize Firebase Admin SDK"""
+    try:
+        # Check if Firebase is already initialized
+        if not firebase_admin._apps:
+            # Load service account key
+            service_account_path = os.path.join(os.path.dirname(__file__), '..', 'serviceAccountKey.json')
+            
+            if os.path.exists(service_account_path):
+                cred = credentials.Certificate(service_account_path)
+                firebase_admin.initialize_app(cred)
+                logging.info("Firebase initialized with service account")
+            else:
+                # Fallback for production environment
+                cred = credentials.ApplicationDefault()
+                firebase_admin.initialize_app(cred)
+                logging.info("Firebase initialized with application default credentials")
+        
+        # Initialize Firestore
+        db = firestore.client()
+        logging.info("Firestore client initialized successfully")
+        return db
+        
+    except Exception as e:
+        logging.error(f"Firebase initialization error: {e}")
+        raise
+
+# Initialize Firebase and export db
+db = initialize_firebase()
+
+# Export the database instance for use in other modules
+__all__ = ['db']
+>>>>>>> Stashed changes
