@@ -44,7 +44,6 @@ const TermsOfServicePage = () => {
             <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
               ⚖️ Fair Use Policy
             </span>
-            <span className="text-sm text-gray-500">Effective Date: August 14, 2025</span>
           </div>
         </div>
 
@@ -57,10 +56,9 @@ const TermsOfServicePage = () => {
                 What You Can Do
               </h3>
               <ul className="text-sm text-gray-600 space-y-1">
-                <li>• Analyze public social media profiles</li>
+                <li>• Analyze public profiles</li>
                 <li>• Get privacy insights and recommendations</li>
                 <li>• Use our AI-powered analysis tools</li>
-                <li>• Export your analysis results</li>
               </ul>
             </CardContent>
           </Card>
@@ -115,10 +113,9 @@ const TermsOfServicePage = () => {
             <CardContent className="prose prose-gray max-w-none">
               <h4 className="text-lg font-semibold mb-3">What TraceLens Does</h4>
               <ul className="list-disc pl-6 space-y-2 mb-6">
-                <li>Analyzes public social media profiles for privacy insights</li>
-                <li>Provides AI-powered sentiment and behavioral analysis</li>
+                <li>Analyzes provided public URLs for privacy insights</li>
+                <li>Provides AI-powered analysis</li>
                 <li>Generates privacy recommendations and risk assessments</li>
-                <li>Offers digital footprint analysis across multiple platforms</li>
               </ul>
 
               <h4 className="text-lg font-semibold mb-3">Service Limitations</h4>
@@ -126,19 +123,8 @@ const TermsOfServicePage = () => {
                 <div className="bg-yellow-50 p-4 rounded-lg">
                   <h5 className="font-semibold text-yellow-800 mb-2">Free Tier Limits</h5>
                   <ul className="text-sm text-yellow-700 space-y-1">
-                    <li>• 3 analyses per day</li>
-                    <li>• Basic analysis types only</li>
+                    <li>• 10 analyses per day</li>
                     <li>• 24-hour data retention</li>
-                    <li>• Community support</li>
-                  </ul>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-lg">
-                  <h5 className="font-semibold text-purple-800 mb-2">Premium Features</h5>
-                  <ul className="text-sm text-purple-700 space-y-1">
-                    <li>• Unlimited analyses</li>
-                    <li>• Advanced AI features</li>
-                    <li>• Extended data retention</li>
-                    <li>• Priority support</li>
                   </ul>
                 </div>
               </div>
@@ -156,7 +142,7 @@ const TermsOfServicePage = () => {
             <CardContent className="prose prose-gray max-w-none">
               <h4 className="text-lg font-semibold mb-3">You Must</h4>
               <ul className="list-disc pl-6 space-y-2 mb-6">
-                <li>Only analyze publicly available social media profiles</li>
+                <li>Only analyze publicly available URLs</li>
                 <li>Comply with all applicable laws and regulations</li>
                 <li>Respect the privacy and rights of others</li>
                 <li>Use the Service for legitimate research or personal purposes</li>
@@ -287,18 +273,11 @@ const TermsOfServicePage = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Shield className="h-5 w-5 text-blue-600" />
-                <span>7. Contact & Modifications</span>
+                <span>7. Modifications</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="text-lg font-semibold mb-3">Questions About Terms?</h4>
-                  <div className="space-y-2 text-sm">
-                    <p>Legal Team: <a href="mailto:legal@tracelens.ai" className="text-blue-600 underline">legal@tracelens.ai</a></p>
-                    <p>General Support: <a href="mailto:support@tracelens.ai" className="text-blue-600 underline">support@tracelens.ai</a></p>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
                 <div>
                   <h4 className="text-lg font-semibold mb-3">Changes to Terms</h4>
                   <p className="text-sm text-gray-600">

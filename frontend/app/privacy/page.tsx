@@ -44,7 +44,6 @@ const PrivacyPolicyPage = () => {
             <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
               🛡️ Privacy First
             </span>
-            <span className="text-sm text-gray-500">Last Updated: August 14, 2025</span>
           </div>
         </div>
 
@@ -68,7 +67,7 @@ const PrivacyPolicyPage = () => {
             <CardContent className="p-6 text-center">
               <UserCheck className="h-8 w-8 text-purple-600 mx-auto mb-3" />
               <h3 className="font-semibold text-gray-900 mb-2">User Control</h3>
-              <p className="text-sm text-gray-600">You control what data we analyze and when</p>
+              <p className="text-sm text-gray-600">You control what data we analyze</p>
             </CardContent>
           </Card>
         </div>
@@ -94,8 +93,7 @@ const PrivacyPolicyPage = () => {
 
               <h4 className="text-lg font-semibold mb-3 mt-6">Analysis Data</h4>
               <ul className="list-disc pl-6 space-y-2">
-                <li>Social media URLs you choose to analyze</li>
-                <li>Analysis type preferences (comprehensive, privacy-only, etc.)</li>
+                <li>URLs you choose to analyze</li>
                 <li>Generated analysis results (automatically deleted after 24 hours)</li>
                 <li>Usage statistics (number of analyses performed)</li>
               </ul>
@@ -123,7 +121,7 @@ const PrivacyPolicyPage = () => {
                 <div>
                   <h4 className="text-lg font-semibold mb-3">Service Delivery</h4>
                   <ul className="list-disc pl-6 space-y-1">
-                    <li>Perform social media analysis</li>
+                    <li>Perform analysis</li>
                     <li>Generate privacy insights</li>
                     <li>Provide personalized recommendations</li>
                     <li>Maintain your analysis history</li>
@@ -145,112 +143,6 @@ const PrivacyPolicyPage = () => {
                   <strong>Important:</strong> We never sell your personal data. We never share your analysis results with third parties. 
                   All analysis is performed securely within our system and results are automatically deleted after 24 hours.
                 </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Data Protection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Lock className="h-5 w-5 text-purple-600" />
-                <span>3. Data Protection & Security</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="prose prose-gray max-w-none">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="text-lg font-semibold mb-3">Encryption</h4>
-                  <ul className="list-disc pl-6 space-y-1">
-                    <li>TLS 1.3 encryption for all data transmission</li>
-                    <li>AES-256 encryption for data at rest</li>
-                    <li>End-to-end encrypted analysis pipeline</li>
-                    <li>Secure Firebase authentication</li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="text-lg font-semibold mb-3">Access Control</h4>
-                  <ul className="list-disc pl-6 space-y-1">
-                    <li>Multi-factor authentication for admin access</li>
-                    <li>Role-based access control (RBAC)</li>
-                    <li>Regular security audits and penetration testing</li>
-                    <li>Automated threat detection and response</li>
-                  </ul>
-                </div>
-              </div>
-
-              <h4 className="text-lg font-semibold mb-3 mt-6">Data Retention</h4>
-              <div className="bg-red-50 p-4 rounded-lg">
-                <p className="text-red-800">
-                  <strong>Automatic Deletion Policy:</strong> All analysis results and temporary data are automatically 
-                  deleted after 24 hours. Account information is retained only as long as your account is active.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Your Rights */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <UserCheck className="h-5 w-5 text-indigo-600" />
-                <span>4. Your Rights (GDPR Compliance)</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="prose prose-gray max-w-none">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="text-lg font-semibold mb-3">Data Access Rights</h4>
-                  <ul className="list-disc pl-6 space-y-1">
-                    <li>Right to access your personal data</li>
-                    <li>Right to data portability</li>
-                    <li>Right to rectification (correct inaccurate data)</li>
-                    <li>Right to erasure ("right to be forgotten")</li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="text-lg font-semibold mb-3">Control Rights</h4>
-                  <ul className="list-disc pl-6 space-y-1">
-                    <li>Right to restrict processing</li>
-                    <li>Right to object to processing</li>
-                    <li>Right to withdraw consent</li>
-                    <li>Right to lodge a complaint with supervisory authority</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 bg-green-50 rounded-lg">
-                <h4 className="text-lg font-semibold mb-2 text-green-800">Exercise Your Rights</h4>
-                <p className="text-green-700">
-                  To exercise any of these rights, contact us at <a href="mailto:privacy@tracelens.ai" className="underline">privacy@tracelens.ai</a>. 
-                  We will respond within 30 days as required by GDPR.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Contact Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Shield className="h-5 w-5 text-blue-600" />
-                <span>5. Contact Us</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <h4 className="font-semibold mb-2">Privacy Officer</h4>
-                  <p className="text-sm text-gray-600">privacy@tracelens.ai</p>
-                </div>
-                <div className="text-center">
-                  <h4 className="font-semibold mb-2">Legal Team</h4>
-                  <p className="text-sm text-gray-600">legal@tracelens.ai</p>
-                </div>
-                <div className="text-center">
-                  <h4 className="font-semibold mb-2">General Support</h4>
-                  <p className="text-sm text-gray-600">support@tracelens.ai</p>
-                </div>
               </div>
             </CardContent>
           </Card>

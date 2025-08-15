@@ -41,7 +41,6 @@ export default function LandingPage() {
           </div>
           <div className="hidden md:flex items-center space-x-6">
             <a href="#features" className="text-gray-600 hover:text-blue-600 transition-colors">Features</a>
-            <a href="#capabilities" className="text-gray-600 hover:text-blue-600 transition-colors">Capabilities</a>
             <a href="#security" className="text-gray-600 hover:text-blue-600 transition-colors">Security</a>
             <Link href="/login">
               <Button>Log In</Button>
@@ -73,8 +72,7 @@ export default function LandingPage() {
             </h1>
             
             <p className="text-xl text-gray-600 mb-10 max-w-3xl mx-auto leading-relaxed">
-              Comprehensive, ethical, and privacy-first analysis of social media profiles
-              with advanced AI insights, enterprise-grade security, and complete user control.
+              Automated, privacy-focused analysis of public online profiles and webpages, providing users with a clear exposure score and actionable recommendations to enhance their digital privacy.
             </p>
             
             {/* Email signup form */}
@@ -113,7 +111,7 @@ export default function LandingPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span>3 free analyses per day</span>
+                      <span>10 free analyses per day</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-500" />
@@ -166,7 +164,7 @@ export default function LandingPage() {
                 <ul className="text-sm space-y-2 text-red-600">
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                    Usage limits (3/day, 1/hour max)
+                    Usage limits (10/day)
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
@@ -354,48 +352,6 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="text-center group">
-              <div className="bg-gradient-to-br from-pink-100 to-red-100 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-                <Heart className="h-10 w-10 text-red-600" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Sentiment Analysis</h3>
-              <p className="text-sm text-gray-600">
-                Comprehensive emotional analysis with confidence scoring and emotional indicator detection
-              </p>
-            </div>
-            
-            <div className="text-center group">
-              <div className="bg-gradient-to-br from-green-100 to-emerald-100 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-                <Hash className="h-10 w-10 text-green-600" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Pattern Recognition</h3>
-              <p className="text-sm text-gray-600">
-                Hashtag trends, mention patterns, and behavioral analysis with trending score calculation
-              </p>
-            </div>
-            
-            <div className="text-center group">
-              <div className="bg-gradient-to-br from-purple-100 to-violet-100 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-                <Clock className="h-10 w-10 text-purple-600" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Schedule Patterns</h3>
-              <p className="text-sm text-gray-600">
-                Temporal analysis, activity rhythm detection, and work-life balance insights
-              </p>
-            </div>
-            
-            <div className="text-center group">
-              <div className="bg-gradient-to-br from-blue-100 to-cyan-100 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-                <DollarSign className="h-10 w-10 text-blue-600" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Economic Indicators</h3>
-              <p className="text-sm text-gray-600">
-                Brand analysis, spending patterns, professional insights, and economic profiling
-              </p>
-            </div>
-          </div>
-
           <div className="mt-16 bg-gradient-to-br from-gray-900 to-blue-900 rounded-3xl p-8 md:p-12 text-white">
             <div className="max-w-4xl mx-auto">
               <div className="text-center mb-10">
@@ -407,7 +363,7 @@ export default function LandingPage() {
                 </p>
               </div>
               
-              <div className="grid md:grid-cols-3 gap-8">
+              <div className="grid md:grid-cols-2 gap-8">
                 <div className="flex items-start space-x-4">
                   <div className="bg-blue-500 rounded-lg p-3">
                     <Zap className="h-6 w-6" />
@@ -419,7 +375,6 @@ export default function LandingPage() {
                     </p>
                   </div>
                 </div>
-                
                 <div className="flex items-start space-x-4">
                   <div className="bg-green-500 rounded-lg p-3">
                     <Eye className="h-6 w-6" />
@@ -428,18 +383,6 @@ export default function LandingPage() {
                     <h4 className="font-semibold mb-2">Full Transparency</h4>
                     <p className="text-blue-100 text-sm">
                       See exactly what data is processed and how insights are generated
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-4">
-                  <div className="bg-purple-500 rounded-lg p-3">
-                    <BarChart3 className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold mb-2">Rich Insights</h4>
-                    <p className="text-blue-100 text-sm">
-                      Comprehensive dashboard with interactive charts and detailed breakdowns
                     </p>
                   </div>
                 </div>
@@ -452,7 +395,7 @@ export default function LandingPage() {
         <section id="security" className="mb-20">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Enterprise-Grade Security & Compliance
+              Security & Compliance
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Built with security-first principles and complete regulatory compliance
@@ -461,7 +404,6 @@ export default function LandingPage() {
 
           <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
             <div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">Security Standards</h3>
               <div className="space-y-4">
                 <div className="flex items-start space-x-4">
                   <div className="bg-blue-100 rounded-lg p-2">
@@ -541,7 +483,7 @@ export default function LandingPage() {
                 </Button>
               </Link>
               <Link href="/demo">
-                <Button size="lg" variant="outline" className="w-full md:w-auto text-lg px-8 py-4 border-white text-white hover:bg-white hover:text-blue-600">
+                <Button size="lg" variant="secondary" className="w-full md:w-auto text-lg px-8 py-4">
                   View Demo
                   <Globe className="ml-2 h-5 w-5" />
                 </Button>
@@ -555,7 +497,7 @@ export default function LandingPage() {
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4" />
-                <span>3 Free Analyses Daily</span>
+                <span>10 Free Analyses Daily</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4" />
@@ -612,9 +554,6 @@ export default function LandingPage() {
                 <li>
                   <a href="/terms" className="hover:text-blue-600 transition-colors">Terms of Service</a>
                 </li>
-                <li>
-                  <a href="/security" className="hover:text-blue-600 transition-colors">Security Overview</a>
-                </li>
               </ul>
             </div>
 
@@ -635,10 +574,6 @@ export default function LandingPage() {
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   <span>System Status: Operational</span>
                 </div>
-                <span>|</span>
-                <span>Version 5.2</span>
-                <span>|</span>
-                <span>Last Updated: {new Date().toLocaleDateString()}</span>
               </div>
             </div>
 

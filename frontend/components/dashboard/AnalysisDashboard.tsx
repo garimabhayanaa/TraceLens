@@ -115,11 +115,7 @@ const AnalysisDashboard: React.FC = () => {
       <Tabs defaultValue="privacy" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
-          <TabsTrigger value="sentiment">Sentiment</TabsTrigger>
-          <TabsTrigger value="economic">Economic</TabsTrigger>
-          <TabsTrigger value="schedule">Schedule</TabsTrigger>
         </TabsList>
-
         <TabsContent value="privacy" className="space-y-4">
           <Card>
             <CardHeader>
@@ -159,99 +155,6 @@ const AnalysisDashboard: React.FC = () => {
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="sentiment" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Heart className="h-5 w-5" />
-                Sentiment Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Overall Sentiment</p>
-                  <p className="text-lg font-semibold">
-                    {results.sentiment_analysis?.overall_sentiment || 'Unknown'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Confidence</p>
-                  <p className="text-lg font-semibold">
-                    {results.sentiment_analysis?.confidence || 'N/A'}%
-                  </p>
-                </div>
-              </div>
-              {results.sentiment_analysis?.trending_topics && (
-                <div className="mt-4">
-                  <p className="text-sm font-medium mb-2">Trending Topics:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {results.sentiment_analysis.trending_topics.map((topic: string, idx: number) => (
-                      <span key={idx} className="px-2 py-1 bg-gray-100 rounded-md text-sm">
-                        {topic}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="economic" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Economic Indicators
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Income Level</p>
-                  <p className="text-lg font-semibold">
-                    {results.economic_indicators?.income_level || 'Unknown'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Economic Risk</p>
-                  <p className="text-lg font-semibold">
-                    {results.economic_indicators?.economic_risk_score || 'N/A'}/10
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="schedule" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Schedule Patterns
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Most Active Time</p>
-                  <p className="text-lg font-semibold">
-                    {results.schedule_patterns?.most_active_time || 'Unknown'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Activity Pattern</p>
-                  <p className="text-lg font-semibold">
-                    {results.schedule_patterns?.activity_pattern || 'Unknown'}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     );
   };
@@ -282,26 +185,15 @@ const AnalysisDashboard: React.FC = () => {
           <div>
             <label className="block text-sm font-medium mb-2">Analysis Type</label>
             <select
-              value={analysisType}
-              onChange={(e) => setAnalysisType(e.target.value)}
+              value="privacy_only"
+              disabled
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="comprehensive">Comprehensive Analysis</option>
               <option value="privacy_only">Privacy Only</option>
-              <option value="sentiment">Sentiment Analysis</option>
-              <option value="basic">Basic Analysis</option>
             </select>
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              {traceLensUser && (
-                <>
-                  Daily Usage: {traceLensUser.dailyUsage}/
-                  {traceLensUser.subscriptionTier === 'free' ? '3' : '∞'}
-                </>
-              )}
-            </div>
             <Button 
               onClick={handleStartAnalysis}
               disabled={isLoading || !url.trim()}

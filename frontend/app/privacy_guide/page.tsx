@@ -100,16 +100,8 @@ export default function PrivacyGuide() {
       <nav className="bg-white/80 backdrop-blur-md shadow-sm p-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <Link href="/" className="text-2xl font-bold text-blue-600">
-            LeakPeek
+            TraceLens
           </Link>
-          <div className="space-x-6">
-            <Link href="/auth" className="text-blue-600 hover:text-blue-800 font-medium">
-              Login
-            </Link>
-            <Link href="/dashboard" className="text-blue-600 hover:text-blue-800 font-medium">
-              Dashboard
-            </Link>
-          </div>
         </div>
       </nav>
 
@@ -127,7 +119,7 @@ export default function PrivacyGuide() {
         {/* Privacy Tips Section */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-gray-800 mb-8 text-center">
-            🛡️ Essential Privacy Tips
+            Essential Privacy Tips
           </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {privacyTips.map((tip, index) => (
@@ -159,7 +151,7 @@ export default function PrivacyGuide() {
         {/* Privacy Tools Section */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-gray-800 mb-8 text-center">
-            🔧 Recommended Privacy Tools
+            Recommended Privacy Tools
           </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {privacyTools.map((tool, index) => (
@@ -182,7 +174,7 @@ export default function PrivacyGuide() {
         {/* Social Media Privacy Guide */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-gray-800 mb-8 text-center">
-            📱 Social Media Privacy Checklist
+            Social Media Privacy Checklist
           </h2>
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="grid md:grid-cols-2 gap-8">
@@ -233,7 +225,7 @@ export default function PrivacyGuide() {
         {/* Digital Footprint Reduction Guide */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-gray-800 mb-8 text-center">
-            👣 Reduce Your Digital Footprint
+            Reduce Your Digital Footprint
           </h2>
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="space-y-6">
@@ -262,7 +254,7 @@ export default function PrivacyGuide() {
           <h2 className="text-3xl font-bold mb-4">Ready to Test Your Privacy?</h2>
           <p className="text-xl mb-6">Use LeakPeek to see what information can be inferred about you from public data.</p>
           <Link 
-            href="/auth" 
+            href="/dashboard"
             className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition inline-block"
           >
             Start Your Analysis

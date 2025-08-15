@@ -18,16 +18,13 @@ export const viewport: Viewport = {
 
 // ✅ Updated metadata export (removed viewport and themeColor)
 export const metadata: Metadata = {
-  title: 'LeakPeek - AI Social Media Privacy Analyzer',
-  description: 'Advanced AI-powered social media analysis with complete privacy protection, legal compliance, and user control. Features 7 integrated security frameworks including abuse prevention, GDPR/CCPA compliance, and ethical boundaries.',
+  title: 'TraceLens - AI Powered Personal Data Exposure Analyser',
+  description: 'Advanced AI-powered data exposure analysis with complete privacy protection, legal compliance, and user control. Features 7 integrated security frameworks including abuse prevention, GDPR/CCPA compliance, and ethical boundaries.',
   keywords: [
     'AI analysis',
     'social media',
     'privacy protection',
     'GDPR compliant',
-    'sentiment analysis',
-    'behavioral analysis',
-    'abuse prevention',
     'ethical AI',
     'data privacy',
     'secure analysis',
@@ -35,9 +32,9 @@ export const metadata: Metadata = {
     'digital footprint',
     'privacy awareness'
   ],
-  authors: [{ name: 'LeakPeek Team' }],
-  creator: 'LeakPeek',
-  publisher: 'LeakPeek',
+  authors: [{ name: 'TraceLens Team' }],
+  creator: 'TraceLens',
+  publisher: 'TraceLens',
   robots: {
     index: true,
     follow: true,
@@ -52,25 +49,18 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://leakpeek.com',
-    title: 'LeakPeek - See What AI Can Infer About You',
-    description: 'Comprehensive AI analysis with enterprise-grade security and complete user control. Your personal OSINT mirror for privacy awareness.',
-    siteName: 'LeakPeek',
+    url: 'https://Tracelens.com',
+    title: 'TraceLens',
+    description: 'Comprehensive AI analysis with security and complete user control. Your personal OSINT mirror for privacy awareness.',
+    siteName: 'TraceLens',
     images: [
       {
         url: '/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'LeakPeek - AI Privacy Analysis Platform',
+        alt: 'TraceLens - AI Privacy Analysis Platform',
       },
     ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'LeakPeek - See What AI Can Infer About You',
-    description: 'Your personal OSINT mirror. Discover what patterns AI can extract from your public data.',
-    images: ['/twitter-image.jpg'],
-    creator: '@leakpeek',
   },
   manifest: '/manifest.json',
   icons: {
@@ -81,7 +71,7 @@ export const metadata: Metadata = {
   category: 'technology',
   classification: 'AI Analysis Platform',
   referrer: 'origin-when-cross-origin',
-  metadataBase: new URL('https://leakpeek.com'),
+  metadataBase: new URL('https://tracelens.com'),
 }
 
 export default function RootLayout({

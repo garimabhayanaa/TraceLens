@@ -144,7 +144,6 @@ const DashboardPage = () => {
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center space-x-2">
                 <span>Welcome back, {user.displayName || 'User'}!</span>
-                <span>👋</span>
               </CardTitle>
               <Button variant="ghost" size="sm" className="flex items-center space-x-2">
                 <Settings className="h-4 w-4" />
@@ -153,7 +152,7 @@ const DashboardPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm text-gray-600">Email</p>
                 <p className="font-semibold truncate">{user.email}</p>
@@ -164,63 +163,9 @@ const DashboardPage = () => {
                   {user.emailVerified ? '✅ Verified' : '⚠️ Unverified'}
                 </p>
               </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <p className="text-sm text-gray-600">Subscription</p>
-                <p className="font-semibold">
-                  {traceLensUser?.subscriptionTier || 'Loading...'}
-                </p>
-              </div>
             </div>
           </CardContent>
         </Card>
-
-        {/* Usage Statistics Section */}
-        {traceLensUser && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Usage Statistics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                  <p className="text-sm text-gray-600">Daily Usage</p>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {traceLensUser.dailyUsage || 0}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    of {traceLensUser.subscriptionTier === 'free' ? '3' : '∞'} allowed
-                  </p>
-                </div>
-                <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <p className="text-sm text-gray-600">Total Analyses</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {traceLensUser.lifetimeAnalysisCount || 0}
-                  </p>
-                  <p className="text-xs text-gray-500">all time</p>
-                </div>
-                <div className="text-center p-4 bg-indigo-50 rounded-lg">
-                  <p className="text-sm text-gray-600">Privacy Level</p>
-                  <p className="text-2xl font-bold text-indigo-600">
-                    {traceLensUser.privacyLevel || 'Standard'}
-                  </p>
-                  <p className="text-xs text-gray-500">protection</p>
-                </div>
-                <div className="text-center p-4 bg-teal-50 rounded-lg">
-                  <p className="text-sm text-gray-600">Member Since</p>
-                  <p className="text-lg font-semibold text-teal-600">
-                    {traceLensUser.createdAt ? 
-                      new Date(traceLensUser.createdAt.toDate()).toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        year: 'numeric' 
-                      }) : 'Recently'
-                    }
-                  </p>
-                  <p className="text-xs text-gray-500">joined</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* System Status Section */}
         <Card>
@@ -275,47 +220,46 @@ const DashboardPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                <h3 className="font-medium text-gray-800 mb-2">🔍 Start Analysis</h3>
-                <p className="text-sm text-gray-600">
-                  Analyze any social media profile for privacy insights and digital footprint assessment.
-                </p>
-              </div>
-              <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                <h3 className="font-medium text-gray-800 mb-2">📊 View History</h3>
-                <p className="text-sm text-gray-600">
-                  Access your previous analysis results and track your privacy improvements over time.
-                </p>
-              </div>
-              <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                <h3 className="font-medium text-gray-800 mb-2">🛡️ Privacy Guide</h3>
-                <p className="text-sm text-gray-600">
-                  Learn practical tips to improve your digital privacy and reduce your online footprint.
-                </p>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <a href="#start_analysis">
+                    <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                        <h3 className="font-medium text-gray-800 mb-2">🔍 Start Analysis</h3>
+                        <p className="text-sm text-gray-600">
+                            Analyze any social media profile for privacy insights and digital footprint assessment.
+                        </p>
+                    </div>
+                </a>
+              <a href='/privacy_guide'>
+                 <div className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                    <h3 className="font-medium text-gray-800 mb-2">🛡️ Privacy Guide</h3>
+                    <p className="text-sm text-gray-600">
+                        Learn practical tips to improve your digital privacy and reduce your online footprint.
+                    </p>
+                </div>
+              </a>
             </div>
           </CardContent>
         </Card>
 
         {/* Main Analysis Dashboard */}
-        <AnalysisDashboard />
+        <div id="start_analysis">
+            <AnalysisDashboard />
+        </div>
 
         {/* Footer Information */}
         <Card>
           <CardContent className="pt-6">
             <div className="text-center text-sm text-gray-500 space-y-2">
-              <p>🔒 Your privacy is our priority. All analysis data is automatically deleted after 24 hours.</p>
-              <p>📧 Questions or feedback? Contact us at support@tracelens.ai</p>
+              <p>Your privacy is our priority. All analysis data is automatically deleted after 24 hours.</p>
               <div className="flex justify-center space-x-4 mt-4">
                 <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                  🔐 GDPR Compliant
+                  GDPR Compliant
                 </span>
                 <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                  🛡️ Privacy First
+                  Privacy First
                 </span>
                 <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
-                  🤖 AI Powered
+                  AI Powered
                 </span>
               </div>
             </div>
