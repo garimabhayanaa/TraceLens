@@ -51,23 +51,9 @@ const AnalysisDashboard: React.FC = () => {
   // Validate URL
   const validateUrl = (inputUrl: string) => {
     const urlPattern = /^https?:\/\/.+/;
-    const socialPlatforms = [
-      'twitter.com', 'x.com', 'linkedin.com', 'github.com', 
-      'instagram.com', 'facebook.com', 'tiktok.com', 'youtube.com'
-    ];
-    
     if (!urlPattern.test(inputUrl)) {
       return 'Please enter a valid URL starting with http:// or https://';
     }
-
-    const containsSocialPlatform = socialPlatforms.some(platform => 
-      inputUrl.toLowerCase().includes(platform)
-    );
-
-    if (!containsSocialPlatform) {
-      return 'Please enter a URL from supported social media platforms (Twitter, LinkedIn, GitHub, Instagram, Facebook, TikTok, YouTube)';
-    }
-
     return '';
   };
 
@@ -280,7 +266,7 @@ const AnalysisDashboard: React.FC = () => {
         <CardContent className="space-y-4">
           <div>
             <Input
-              placeholder="Enter social media URL (e.g., https://twitter.com/username)"
+              placeholder="Enter a social media profile URL, Medium article, news site, public blog, or any public webpage URL"
               value={url}
               onChange={(e) => {
                 setUrl(e.target.value);

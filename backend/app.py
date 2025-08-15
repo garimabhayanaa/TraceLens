@@ -7,6 +7,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import ssl
 
+
 # Temporary SSL fix for development
 try:
     _create_unverified_https_context = ssl._create_unverified_context

@@ -89,7 +89,7 @@ def start_analysis():
         # Check usage limits
         daily_usage = user_data.get('daily_usage', 0)
         subscription_tier = user_data.get('subscription_tier', 'free')
-        daily_limit = 3 if subscription_tier == 'free' else 999  # Essentially unlimited for premium
+        daily_limit = 100 if subscription_tier == 'free' else 999  # Essentially unlimited for premium
         
         if daily_usage >= daily_limit:
             logging.warning(f"User {user_id} exceeded daily limit: {daily_usage}/{daily_limit}")
