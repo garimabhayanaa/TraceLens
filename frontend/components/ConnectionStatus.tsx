@@ -1,7 +1,7 @@
 // components/ConnectionStatus.tsx
 'use client'
 
-import { useAuth } from '../lib/auth-context.tsx'
+import { useAuth } from '../lib/auth-context'
 import { useState } from 'react'
 import { X, Wifi, WifiOff, RotateCcw } from 'lucide-react'
 
