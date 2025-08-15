@@ -7,6 +7,7 @@ import json
 import time
 from typing import Dict, Any, Optional
 import random
+from dotenv import load_dotenv
 
 class AIAnalysisService:
     """Enhanced AI Analysis Service with real web scraping using ScrapingBee and Gemini Pro integration"""
@@ -15,7 +16,7 @@ class AIAnalysisService:
         self.logger = logging.getLogger(__name__)
 
         # Configure Gemini Pro API
-        self.gemini_api_key = "AIzaSyBJxFh-jQUDTCteXvAA1DE-EEVmH5OfSkE"
+        self.gemini_api_key = os.getenv('GEMINI_API_KEY')
         genai.configure(api_key=self.gemini_api_key)
         self.model = genai.GenerativeModel(
             "gemini-1.5-flash",  # Use the Pro model for better analysis
@@ -26,7 +27,7 @@ class AIAnalysisService:
             }
         )
 
-        self.scrapingbee_api_key = "PVTH5SH0FWZQJIKBJGV0NOGVYP4YAQTXTJDRTMKB9N5RWTCKW5BAD9Y1293JJSTOCTP1EWESWH6KXOYC"
+        self.scrapingbee_api_key = os.getenv('SCRAPINGBEE_API_KEY')
         if not self.scrapingbee_api_key:
             self.logger.error("ScrapingBee API key is not set in environment variable SCRAPINGBEE_API_KEY")
 
