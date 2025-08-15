@@ -41,7 +41,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-pr
 
 # ✅ COMPREHENSIVE CORS CONFIGURATION FOR FRONTEND-BACKEND COMMUNICATION
 CORS(app, 
-     origins=['https://trace-lens.vercel.app/'],
+     origins=['https://trace-lens.vercel.app'],
      supports_credentials=True,
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=[
@@ -52,12 +52,12 @@ CORS(app,
      ],
      resources={
          r"/api/*": {
-             "origins": ["https://trace-lens.vercel.app/"],
+             "origins": ["https://trace-lens.vercel.app"],
              "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
              "allow_headers": ["Content-Type", "Authorization"]
          },
          r"/health": {
-             "origins": ["https://trace-lens.vercel.app/"],
+             "origins": ["https://trace-lens.vercel.app"],
              "methods": ["GET", "OPTIONS"]
          }
      })
@@ -78,7 +78,7 @@ app.register_blueprint(analysis_bp, url_prefix='/api/analysis')
 def handle_preflight():
     if request.method == "OPTIONS":
         response = jsonify({'status': 'OK'})
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3000")
+        response.headers.add("Access-Control-Allow-Origin", "https://trace-lens.vercel.app")
         response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization")
         response.headers.add('Access-Control-Allow-Methods', "GET,POST,PUT,DELETE,OPTIONS")
         response.headers.add('Access-Control-Allow-Credentials', 'true')
@@ -118,7 +118,7 @@ def root():
         'status': 'active',
         'database': 'Firebase Firestore',
         'authentication': 'Firebase Auth',
-        'cors': 'enabled for localhost:3000',
+        'cors': 'enabled for https://trace-lens.vercel.app',
         'endpoints': {
             'health': '/health',
             'analysis': '/api/analysis',
@@ -234,7 +234,7 @@ if __name__ == '__main__':
     logger.info("🛡️ Security Frameworks: Active")
     logger.info("🤖 AI Analysis Service: Ready")
     logger.info("✅ Backend ready for frontend connection")
-    logger.info("🌐 CORS enabled for localhost:3000")
+    logger.info("🌐 CORS enabled for https://trace-lens.vercel.app")
     
     app.run(
         debug=True,
