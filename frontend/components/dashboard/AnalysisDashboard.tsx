@@ -71,7 +71,7 @@ const AnalysisDashboard: React.FC = () => {
     }
 
     // Check daily usage limit
-    if (traceLensUser.subscriptionTier === 'free' && traceLensUser.dailyUsage >= 3) {
+    if (traceLensUser.subscriptionTier === 'free' && (traceLensUser.dailyUsage ?? 0) >= 3) {
       toast.error('Daily analysis limit reached. Upgrade to continue.');
       return;
     }
