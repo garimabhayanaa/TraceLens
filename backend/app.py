@@ -41,7 +41,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-pr
 
 # ✅ COMPREHENSIVE CORS CONFIGURATION FOR FRONTEND-BACKEND COMMUNICATION
 CORS(app, 
-     origins=['http://localhost:3000', 'http://127.0.0.1:3000'],
+     origins=['https://trace-lens.vercel.app/'],
      supports_credentials=True,
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=[
@@ -52,12 +52,12 @@ CORS(app,
      ],
      resources={
          r"/api/*": {
-             "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+             "origins": ["https://trace-lens.vercel.app/"],
              "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
              "allow_headers": ["Content-Type", "Authorization"]
          },
          r"/health": {
-             "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+             "origins": ["https://trace-lens.vercel.app/"],
              "methods": ["GET", "OPTIONS"]
          }
      })
