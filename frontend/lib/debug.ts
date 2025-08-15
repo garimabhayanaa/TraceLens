@@ -1,6 +1,7 @@
 export const testBackendConnection = async () => {
+  const BACKEND_URL="https://tracelens.onrender.com"
   try {
-    const response = await fetch('http://localhost:5000/health', {
+    const response = await fetch(`${BACKEND_URL}/health`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
