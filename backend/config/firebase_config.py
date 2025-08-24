@@ -8,7 +8,7 @@ def initialize_firebase():
     try:
         # Initialize the firebase app only once
         if not firebase_admin._apps:
-            service_account_path = os.path.join(os.path.dirname(__file__), '..', 'serviceAccountKey.json')
+            service_account_path = os.path.join(os.path.dirname(__file__), '..', 'FIREBASE_SERVICE_ACCOUNT_JSON')
             if os.path.exists(service_account_path):
                 cred = credentials.Certificate(service_account_path)
                 firebase_admin.initialize_app(cred)
