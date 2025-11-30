@@ -23,6 +23,3 @@ This project is developed entirely on GitHub with cloud-based deployment.
 - User consent required
 - Self-analysis only
 - No malicious use permitted
-
-## Development Status
-🚧 In Development - Minor Project 2025
